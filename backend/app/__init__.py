@@ -6,10 +6,12 @@ from .config import Config
 from .auth import auth_bp
 from .users.routes import users_bp
 from .events.routes import events_bp
+from flask_cors import CORS
 
 
 def create_app():
     app = Flask(__name__)
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
     app.config.from_object(Config)
 
     # Initialize Firebase

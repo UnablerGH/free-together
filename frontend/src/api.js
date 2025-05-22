@@ -13,7 +13,7 @@ export async function login({ email, password }) {
   // Call Firebase Auth emulator REST
   const resp = await fetch(`http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json'},
     body: JSON.stringify({ email, password, returnSecureToken: true })
   });
   return resp.json();
