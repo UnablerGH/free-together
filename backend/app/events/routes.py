@@ -8,8 +8,6 @@ from ..schemas.response import ResponseCreateModel
 
 events_bp = Blueprint('events', __name__)
  
-events_bp = Blueprint('events', __name__)
- 
 
 @events_bp.route('', methods=['POST'])
 @auth_required
