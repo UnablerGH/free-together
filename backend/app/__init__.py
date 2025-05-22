@@ -1,4 +1,5 @@
 import os
+import firebase_admin
 from flask import Flask, app
 from firebase_admin import credentials, initialize_app
 from .config import Config
@@ -12,10 +13,11 @@ def create_app():
     app.config.from_object(Config)
 
     # Initialize Firebase
-    cred = credentials.Certificate(app.config['FIREBASE_CRED_PATH'])
-    initialize_app(cred, {
-        'projectId': app.config['FIREBASE_PROJECT_ID'],
-    })
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(app.config['FIREBASE_CRED_PATH'])
+        initialize_app(cred, {
+            'projectId': app.config['FIREBASE_PROJECT_ID'],
+        })
 
     # Register Blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
