@@ -84,3 +84,23 @@ def list_responses(event_id):
         r = doc.to_dict(); r['responseId'] = doc.id
         responses.append(r)
     return jsonify(responses), 200
+
+
+# DELETE an event (owner only)
+@events_bp.route('/<event_id>', methods=['DELETE'])
+@auth_required
+def delete_event(event_id):
+    db = firestore.client()
+    doc_ref = db.collection('events').document(event_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return jsonify({'message': 'Event not found'}), 404
+    event = doc.to_dict()
+    if event.get('createdBy') != g.current_user['uid']:
+        return jsonify({'message': 'Forbidden'}), 403
+    # Delete all responses subcollection
+    for resp in doc_ref.collection('responses').stream():
+        doc_ref.collection('responses').document(resp.id).delete()
+    # Delete the event
+    doc_ref.delete()
+    return jsonify({'message': 'Event deleted'}), 200
