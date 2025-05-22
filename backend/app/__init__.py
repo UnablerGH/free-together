@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, app
 from firebase_admin import credentials, initialize_app
 from .config import Config
 from .auth import auth_bp
@@ -22,4 +22,12 @@ def create_app():
     app.register_blueprint(users_bp, url_prefix='/api/v1/users')
     app.register_blueprint(events_bp, url_prefix='/api/v1/events')
 
+    # Health check route
+    @app.route('/healthz', methods=['GET'])
+    def health_check():
+        return {'status': 'ok'}, 200
+
     return app
+
+
+
