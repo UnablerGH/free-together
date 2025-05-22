@@ -4,3 +4,4 @@ backend/serviceAccountKey.json
 __pycache__/
 firebase-debug.log
 firestore-debug.log
+.pytest_cache/
