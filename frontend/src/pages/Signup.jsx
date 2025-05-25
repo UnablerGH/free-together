@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Container,
@@ -22,8 +22,8 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await signup(formData.email, formData.password, formData.username);
-    if (!error) {
+    const success = await signup(formData.email, formData.password, formData.username);
+    if (success) {
       navigate('/');
     }
   };
@@ -65,6 +65,7 @@ export default function Signup() {
             autoFocus
             value={formData.username}
             onChange={handleChange}
+            disabled={loading}
           />
           <TextField
             margin="normal"
@@ -76,6 +77,7 @@ export default function Signup() {
             autoComplete="email"
             value={formData.email}
             onChange={handleChange}
+            disabled={loading}
           />
           <TextField
             margin="normal"
@@ -88,6 +90,7 @@ export default function Signup() {
             autoComplete="new-password"
             value={formData.password}
             onChange={handleChange}
+            disabled={loading}
           />
           <Button
             type="submit"

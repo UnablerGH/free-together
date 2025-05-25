@@ -22,8 +22,8 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await login(formData.email, formData.password);
-    if (!error) {
+    const success = await login(formData.email, formData.password);
+    if (success) {
       navigate('/');
     }
   };
@@ -65,6 +65,7 @@ export default function Login() {
             autoFocus
             value={formData.email}
             onChange={handleChange}
+            disabled={loading}
           />
           <TextField
             margin="normal"
@@ -77,6 +78,7 @@ export default function Login() {
             autoComplete="current-password"
             value={formData.password}
             onChange={handleChange}
+            disabled={loading}
           />
           <Button
             type="submit"
