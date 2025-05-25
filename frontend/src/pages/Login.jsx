@@ -1,45 +1,99 @@
 // src/pages/Login.jsx
 import React, { useState } from 'react';
-import { login } from '../api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Link,
+  Alert,
+} from '@mui/material';
+import { useAuthStore } from '../stores/authStore';
 
 export default function Login() {
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login, error, loading } = useAuthStore();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
 
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    try {
-      const data = await login(form);
-      if (!data.idToken) {
-        throw new Error(data.error?.message || 'Login failed');
-      }
-      localStorage.setItem('idToken', data.idToken);
-      navigate('/events');
-    } catch (err) {
-      setError(err.message);
+    await login(formData.email, formData.password);
+    if (!error) {
+      navigate('/');
     }
-  }
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h1>Log In</h1>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-      <input
-        type="email"
-        placeholder="Email"
-        required
-        onChange={e => setForm({ ...form, email: e.target.value })}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        required
-        onChange={e => setForm({ ...form, password: e.target.value })}
-      />
-      <button type="submit">Log In</button>
-    </form>
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Typography component="h1" variant="h5">
+          Sign in
+        </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
+            {error}
+          </Alert>
+        )}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
+            autoFocus
+            value={formData.email}
+            onChange={handleChange}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={formData.password}
+            onChange={handleChange}
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            disabled={loading}
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </Button>
+          <Box sx={{ textAlign: 'center' }}>
+            <Link component={RouterLink} to="/signup" variant="body2">
+              {"Don't have an account? Sign Up"}
+            </Link>
+          </Box>
+        </Box>
+      </Box>
+    </Container>
   );
 }
