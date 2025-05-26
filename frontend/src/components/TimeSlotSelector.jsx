@@ -7,7 +7,6 @@ import {
   Alert,
 } from '@mui/material';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23
 
 const formatHour = (hour) => {
@@ -17,50 +16,121 @@ const formatHour = (hour) => {
   return `${hour - 12} PM`;
 };
 
-export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, disabled = false }) {
+const generateDateRange = (startDate, endDate) => {
+  if (!startDate || !endDate) {
+    // Fallback to generic weekdays if no date range provided
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({
+      displayName: day,
+      key: day.toLowerCase(),
+      date: null
+    }));
+  }
+
+  const dates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Generate all dates in the range
+  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const dayNumber = date.getDate();
+    const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+    
+    dates.push({
+      displayName: `${dayName} ${dayNumber} ${monthName}`,
+      key: `${dayName.toLowerCase()}_${date.toISOString().split('T')[0]}`, // e.g., "monday_2024-05-26"
+      date: new Date(date),
+      dayOfWeek: dayName.toLowerCase()
+    });
+  }
+  
+  return dates;
+};
+
+export default function TimeSlotSelector({ 
+  selectedSlots = [], 
+  maybeSlots = [], 
+  onSlotsChange, 
+  onMaybeSlotsChange,
+  disabled = false,
+  startDate = null,
+  endDate = null
+}) {
   const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(null); // 'add' or 'remove'
+  const [selectionMode, setSelectionMode] = useState(null); // 'available', 'maybe', or 'remove'
+  const [currentSelectionType, setCurrentSelectionType] = useState('available'); // 'available' or 'maybe'
   const containerRef = useRef(null);
 
-  const getSlotKey = (day, hour) => `${day.toLowerCase()}_${hour}`;
+  // Generate the date range based on start and end dates
+  const dateRange = generateDateRange(startDate, endDate);
 
-  const isSlotSelected = (day, hour) => {
-    return selectedSlots.includes(getSlotKey(day, hour));
+  const getSlotKey = (dayKey, hour) => `${dayKey}_${hour}`;
+
+  const getSlotStatus = (dayKey, hour) => {
+    const slotKey = getSlotKey(dayKey, hour);
+    if (selectedSlots.includes(slotKey)) return 'available';
+    if (maybeSlots.includes(slotKey)) return 'maybe';
+    return 'none';
   };
 
-  const handleMouseDown = useCallback((day, hour, event) => {
+  const applySlotChange = (slotKey, mode) => {
+    // Remove from both arrays first
+    const newSelectedSlots = selectedSlots.filter(slot => slot !== slotKey);
+    const newMaybeSlots = maybeSlots.filter(slot => slot !== slotKey);
+    
+    // Add to appropriate array based on mode
+    if (mode === 'available') {
+      onSlotsChange([...newSelectedSlots, slotKey]);
+      onMaybeSlotsChange(newMaybeSlots);
+    } else if (mode === 'maybe') {
+      onSlotsChange(newSelectedSlots);
+      onMaybeSlotsChange([...newMaybeSlots, slotKey]);
+    } else if (mode === 'remove') {
+      onSlotsChange(newSelectedSlots);
+      onMaybeSlotsChange(newMaybeSlots);
+    }
+  };
+
+  const handleMouseDown = useCallback((dayKey, hour, event) => {
     if (disabled) return;
     
     event.preventDefault();
     setIsSelecting(true);
     
-    const slotKey = getSlotKey(day, hour);
-    const isCurrentlySelected = selectedSlots.includes(slotKey);
+    const slotKey = getSlotKey(dayKey, hour);
+    const currentStatus = getSlotStatus(dayKey, hour);
     
-    // Determine if we're adding or removing slots
-    const mode = isCurrentlySelected ? 'remove' : 'add';
+    // Determine selection mode based on current status and selection type
+    let mode;
+    if (currentStatus === 'none') {
+      mode = currentSelectionType; // Add available or maybe
+    } else if (currentStatus === currentSelectionType) {
+      mode = 'remove'; // Remove if clicking same type
+    } else {
+      mode = currentSelectionType; // Switch to other type
+    }
+    
     setSelectionMode(mode);
     
-    // Toggle this slot
-    if (mode === 'add') {
-      onSlotsChange([...selectedSlots, slotKey]);
-    } else {
-      onSlotsChange(selectedSlots.filter(slot => slot !== slotKey));
-    }
-  }, [selectedSlots, onSlotsChange, disabled]);
+    // Apply the change
+    applySlotChange(slotKey, mode);
+  }, [selectedSlots, maybeSlots, currentSelectionType, disabled]);
 
-  const handleMouseEnter = useCallback((day, hour) => {
+  const handleMouseEnter = useCallback((dayKey, hour) => {
     if (!isSelecting || disabled) return;
     
-    const slotKey = getSlotKey(day, hour);
-    const isCurrentlySelected = selectedSlots.includes(slotKey);
+    const slotKey = getSlotKey(dayKey, hour);
+    const currentStatus = getSlotStatus(dayKey, hour);
     
-    if (selectionMode === 'add' && !isCurrentlySelected) {
-      onSlotsChange([...selectedSlots, slotKey]);
-    } else if (selectionMode === 'remove' && isCurrentlySelected) {
-      onSlotsChange(selectedSlots.filter(slot => slot !== slotKey));
+    // Apply same mode as mouse down for consistency
+    if (selectionMode && (
+      (selectionMode === 'available' && currentStatus !== 'available') ||
+      (selectionMode === 'maybe' && currentStatus !== 'maybe') ||
+      (selectionMode === 'remove' && currentStatus !== 'none')
+    )) {
+      applySlotChange(slotKey, selectionMode);
     }
-  }, [isSelecting, selectionMode, selectedSlots, onSlotsChange, disabled]);
+  }, [isSelecting, selectionMode, selectedSlots, maybeSlots, disabled]);
 
   const handleMouseUp = useCallback(() => {
     setIsSelecting(false);
@@ -75,16 +145,18 @@ export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, di
 
   const clearAll = () => {
     onSlotsChange([]);
+    onMaybeSlotsChange([]);
   };
 
   const selectAll = () => {
     const allSlots = [];
-    DAYS.forEach(day => {
+    dateRange.forEach(dateInfo => {
       HOURS.forEach(hour => {
-        allSlots.push(getSlotKey(day, hour));
+        allSlots.push(getSlotKey(dateInfo.key, hour));
       });
     });
     onSlotsChange(allSlots);
+    onMaybeSlotsChange([]);
   };
 
   return (
@@ -93,16 +165,69 @@ export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, di
         <Typography variant="h6" gutterBottom>
           Select Your Available Time Slots
         </Typography>
+        {startDate && endDate && (
+          <Typography variant="body1" sx={{ mb: 1, fontWeight: 600, color: 'primary.main' }}>
+            Date Range: {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Click and drag to select time slots when you're available. Green = available.
+          Click and drag to select time slots. Green = available, Yellow = maybe available.
         </Typography>
         
-        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+          <Button 
+            variant={currentSelectionType === 'available' ? 'contained' : 'outlined'}
+            size="small" 
+            onClick={() => setCurrentSelectionType('available')}
+            disabled={disabled}
+            sx={{ 
+              backgroundColor: currentSelectionType === 'available' ? 'primary.main' : 'transparent',
+              color: currentSelectionType === 'available' ? 'white' : 'primary.main',
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                backgroundColor: currentSelectionType === 'available' ? 'primary.dark' : 'action.hover',
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
+          >
+            Available (Green)
+          </Button>
+          <Button 
+            variant={currentSelectionType === 'maybe' ? 'contained' : 'outlined'}
+            size="small" 
+            onClick={() => setCurrentSelectionType('maybe')}
+            disabled={disabled}
+            sx={{ 
+              backgroundColor: currentSelectionType === 'maybe' ? '#ff9800' : 'transparent',
+              color: currentSelectionType === 'maybe' ? 'white' : '#ff9800',
+              borderColor: '#ff9800',
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                backgroundColor: currentSelectionType === 'maybe' ? '#f57c00' : 'rgba(255, 152, 0, 0.1)',
+                borderColor: '#f57c00',
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
+          >
+            Maybe (Yellow)
+          </Button>
           <Button 
             variant="outlined" 
             size="small" 
             onClick={selectAll}
             disabled={disabled}
+            sx={{
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
           >
             Select All
           </Button>
@@ -111,14 +236,22 @@ export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, di
             size="small" 
             onClick={clearAll}
             disabled={disabled}
+            sx={{
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
           >
             Clear All
           </Button>
         </Box>
 
-        {selectedSlots.length > 0 && (
+        {(selectedSlots.length > 0 || maybeSlots.length > 0) && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            {selectedSlots.length} time slot{selectedSlots.length !== 1 ? 's' : ''} selected
+            {selectedSlots.length} available, {maybeSlots.length} maybe
           </Alert>
         )}
       </Box>
@@ -133,23 +266,24 @@ export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, di
           msUserSelect: 'none',
         }}
       >
-        <Box sx={{ minWidth: '800px' }}>
-          {/* Header with days */}
+        <Box sx={{ minWidth: `${Math.max(800, dateRange.length * 120)}px` }}>
+          {/* Header with dates */}
           <Box sx={{ display: 'flex', mb: 1 }}>
             <Box sx={{ width: '60px', flexShrink: 0 }}></Box>
-            {DAYS.map(day => (
+            {dateRange.map(dateInfo => (
               <Box 
-                key={day}
+                key={dateInfo.key}
                 sx={{ 
                   flex: 1, 
                   textAlign: 'center', 
                   py: 1,
                   fontWeight: 600,
-                  fontSize: '0.875rem',
-                  color: 'text.primary'
+                  fontSize: '0.75rem',
+                  color: 'text.primary',
+                  minWidth: '120px'
                 }}
               >
-                {day}
+                {dateInfo.displayName}
               </Box>
             ))}
           </Box>
@@ -171,31 +305,37 @@ export default function TimeSlotSelector({ selectedSlots = [], onSlotsChange, di
                 {formatHour(hour)}
               </Box>
               
-              {/* Day slots */}
-              {DAYS.map(day => (
-                <Box
-                  key={`${day}_${hour}`}
-                  sx={{
-                    flex: 1,
-                    height: '24px',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    cursor: disabled ? 'default' : 'pointer',
-                    backgroundColor: isSlotSelected(day, hour) 
-                      ? 'primary.main' 
-                      : 'background.paper',
-                    opacity: disabled ? 0.5 : 1,
-                    transition: 'background-color 0.1s ease',
-                    '&:hover': disabled ? {} : {
-                      backgroundColor: isSlotSelected(day, hour) 
-                        ? 'primary.dark' 
-                        : 'action.hover',
-                    }
-                  }}
-                  onMouseDown={(e) => handleMouseDown(day, hour, e)}
-                  onMouseEnter={() => handleMouseEnter(day, hour)}
-                />
-              ))}
+              {/* Date slots */}
+              {dateRange.map(dateInfo => {
+                const slotStatus = getSlotStatus(dateInfo.key, hour);
+                return (
+                  <Box
+                    key={`${dateInfo.key}_${hour}`}
+                    sx={{
+                      flex: 1,
+                      height: '24px',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      cursor: disabled ? 'default' : 'pointer',
+                      backgroundColor: 
+                        slotStatus === 'available' ? 'primary.main' :
+                        slotStatus === 'maybe' ? '#ff9800' :
+                        'background.paper',
+                      opacity: disabled ? 0.5 : 1,
+                      transition: 'background-color 0.1s ease',
+                      minWidth: '120px',
+                      '&:hover': disabled ? {} : {
+                        backgroundColor: 
+                          slotStatus === 'available' ? 'primary.dark' :
+                          slotStatus === 'maybe' ? '#f57c00' :
+                          'action.hover',
+                      }
+                    }}
+                    onMouseDown={(e) => handleMouseDown(dateInfo.key, hour, e)}
+                    onMouseEnter={() => handleMouseEnter(dateInfo.key, hour)}
+                  />
+                );
+              })}
             </Box>
           ))}
         </Box>

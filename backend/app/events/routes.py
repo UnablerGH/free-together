@@ -26,10 +26,14 @@ def create_event():
         'name': payload.name,
         'type': payload.type,
         'timezone': payload.timezone,
+        'startDate': payload.start_date.isoformat(),
+        'endDate': payload.end_date.isoformat(),
         'invitees': payload.invitees,
         'createdBy': g.current_user['uid'],
         'createdAt': SERVER_TIMESTAMP,
-        'closed': False
+        'status': 'collecting',  # collecting, scheduled, closed
+        'scheduledDate': None,
+        'scheduledTime': None
     })
     return jsonify({'eventId': doc_ref.id}), 201
 
@@ -100,7 +104,7 @@ def get_event(event_id):
         e['ownerEmail'] = owner_user.email
         e['ownerName'] = owner_user.display_name or owner_user.email
     except Exception as ex:
-        logger.warning(f"Could not get owner info: {ex}")
+        print(f"Could not get owner info: {ex}")
         e['ownerEmail'] = 'Unknown'
         e['ownerName'] = 'Unknown'
     
@@ -141,8 +145,11 @@ def create_response(event_id):
     }
     
     # Handle When2Meet-style time slot availability
-    if payload.timeSlots:
-        response_data['timeSlots'] = payload.timeSlots
+    if payload.timeSlots or payload.maybeSlots:
+        if payload.timeSlots:
+            response_data['timeSlots'] = payload.timeSlots
+        if payload.maybeSlots:
+            response_data['maybeSlots'] = payload.maybeSlots
         # Get user info for display
         try:
             user = auth.get_user(g.current_user['uid'])
@@ -249,49 +256,185 @@ def get_heatmap_data(event_id):
     responses = db.collection('events').document(event_id).collection('responses').stream()
     
     # Build heatmap data
-    slot_counts = {}  # slot -> count
-    user_responses = []  # list of {userName, timeSlots}
+    slot_counts = {}  # slot -> count (yes responses)
+    maybe_counts = {}  # slot -> count (maybe responses)
+    user_responses = []  # list of {userName, timeSlots, maybeSlots}
     
     for response_doc in responses:
         response_data = response_doc.to_dict()
         time_slots = response_data.get('timeSlots', [])
+        maybe_slots = response_data.get('maybeSlots', [])
         user_name = response_data.get('userName', 'Unknown User')
         
-        if time_slots:
+        if time_slots or maybe_slots:
             user_responses.append({
                 'userName': user_name,
                 'timeSlots': time_slots,
+                'maybeSlots': maybe_slots,
                 'userId': response_data.get('userId')
             })
             
             # Count each slot
             for slot in time_slots:
                 slot_counts[slot] = slot_counts.get(slot, 0) + 1
+            
+            for slot in maybe_slots:
+                maybe_counts[slot] = maybe_counts.get(slot, 0) + 1
     
-    # Generate time grid (7 days x 24 hours)
-    days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-    hours = list(range(24))  # 0-23
+    # Generate time grid based on event date range
+    from datetime import datetime, timedelta
     
-    heatmap_grid = []
-    for day in days:
-        day_data = []
-        for hour in hours:
-            slot_key = f"{day}_{hour}"
-            count = slot_counts.get(slot_key, 0)
-            day_data.append({
-                'slot': slot_key,
-                'count': count,
+    try:
+        start_date = datetime.fromisoformat(event_data.get('startDate'))
+        end_date = datetime.fromisoformat(event_data.get('endDate'))
+    except (ValueError, TypeError):
+        # Fallback to generic weekdays if date parsing fails
+        days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        hours = list(range(24))  # 0-23
+        
+        heatmap_grid = []
+        for day in days:
+            day_data = []
+            for hour in hours:
+                slot_key = f"{day}_{hour}"
+                count = slot_counts.get(slot_key, 0)
+                maybe_count = maybe_counts.get(slot_key, 0)
+                day_data.append({
+                    'slot': slot_key,
+                    'count': count,
+                    'maybeCount': maybe_count,
+                    'day': day,
+                    'hour': hour
+                })
+            heatmap_grid.append({
                 'day': day,
-                'hour': hour
+                'slots': day_data
             })
-        heatmap_grid.append({
-            'day': day,
-            'slots': day_data
-        })
+    else:
+        # Generate actual date range
+        hours = list(range(24))  # 0-23
+        heatmap_grid = []
+        
+        current_date = start_date
+        while current_date <= end_date:
+            day_name = current_date.strftime('%A').lower()
+            date_str = current_date.strftime('%Y-%m-%d')
+            day_key = f"{day_name}_{date_str}"
+            
+            day_data = []
+            for hour in hours:
+                slot_key = f"{day_key}_{hour}"
+                # Also check old format for backward compatibility
+                old_slot_key = f"{day_name}_{hour}"
+                count = slot_counts.get(slot_key, slot_counts.get(old_slot_key, 0))
+                maybe_count = maybe_counts.get(slot_key, maybe_counts.get(old_slot_key, 0))
+                
+                day_data.append({
+                    'slot': slot_key,
+                    'count': count,
+                    'maybeCount': maybe_count,
+                    'day': day_key,
+                    'hour': hour
+                })
+            
+            heatmap_grid.append({
+                'day': day_key,
+                'slots': day_data
+            })
+            
+            current_date += timedelta(days=1)
     
     return jsonify({
         'heatmapGrid': heatmap_grid,
         'userResponses': user_responses,
         'totalResponses': len(user_responses),
-        'maxCount': max(slot_counts.values()) if slot_counts else 0
+        'maxCount': max(slot_counts.values()) if slot_counts else 0,
+        'maxMaybeCount': max(maybe_counts.values()) if maybe_counts else 0
     }), 200
+
+@events_bp.route('/<event_id>/schedule', methods=['POST'])
+@auth_required
+def schedule_event(event_id):
+    """Schedule an event at a specific date/time and close availability collection"""
+    db = firestore.client()
+    uid = g.current_user['uid']
+    
+    # Check if user is owner
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'message': 'Event not found'}), 404
+    
+    event_data = event_doc.to_dict()
+    if event_data.get('createdBy') != uid:
+        return jsonify({'message': 'Only event owner can schedule events'}), 403
+    
+    data = request.get_json() or {}
+    scheduled_date = data.get('scheduledDate')  # ISO date string
+    scheduled_time = data.get('scheduledTime')  # Time string like "14:30"
+    
+    if not scheduled_date or not scheduled_time:
+        return jsonify({'error': 'scheduledDate and scheduledTime are required'}), 400
+    
+    # Update event status
+    db.collection('events').document(event_id).update({
+        'status': 'scheduled',
+        'scheduledDate': scheduled_date,
+        'scheduledTime': scheduled_time,
+        'scheduledAt': SERVER_TIMESTAMP
+    })
+    
+    return jsonify({
+        'message': 'Event scheduled successfully',
+        'scheduledDate': scheduled_date,
+        'scheduledTime': scheduled_time
+    }), 200
+
+@events_bp.route('/<event_id>/close', methods=['POST'])
+@auth_required
+def close_event(event_id):
+    """Close availability collection without scheduling"""
+    db = firestore.client()
+    uid = g.current_user['uid']
+    
+    # Check if user is owner
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'message': 'Event not found'}), 404
+    
+    event_data = event_doc.to_dict()
+    if event_data.get('createdBy') != uid:
+        return jsonify({'message': 'Only event owner can close events'}), 403
+    
+    # Update event status
+    db.collection('events').document(event_id).update({
+        'status': 'closed',
+        'closedAt': SERVER_TIMESTAMP
+    })
+    
+    return jsonify({'message': 'Event closed successfully'}), 200
+
+@events_bp.route('/<event_id>/reopen', methods=['POST'])
+@auth_required
+def reopen_event(event_id):
+    """Reopen event for availability collection"""
+    db = firestore.client()
+    uid = g.current_user['uid']
+    
+    # Check if user is owner
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'message': 'Event not found'}), 404
+    
+    event_data = event_doc.to_dict()
+    if event_data.get('createdBy') != uid:
+        return jsonify({'message': 'Only event owner can reopen events'}), 403
+    
+    # Update event status
+    db.collection('events').document(event_id).update({
+        'status': 'collecting',
+        'scheduledDate': None,
+        'scheduledTime': None,
+        'reopenedAt': SERVER_TIMESTAMP
+    })
+    
+    return jsonify({'message': 'Event reopened for availability collection'}), 200

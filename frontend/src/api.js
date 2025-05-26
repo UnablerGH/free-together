@@ -73,10 +73,14 @@ export const eventsAPI = {
   createEvent: (data) => api.post('/events', data),
   listEvents: () => api.get('/events'),
   getEvent: (eventId) => api.get(`/events/${eventId}`),
+  deleteEvent: (eventId) => api.delete(`/events/${eventId}`),
   submitResponse: (eventId, data) => api.post(`/events/${eventId}/responses`, data),
   getResponses: (eventId) => api.get(`/events/${eventId}/responses`),
   inviteUsers: (eventId, data) => api.post(`/events/${eventId}/invite`, data),
   getHeatmapData: (eventId) => api.get(`/events/${eventId}/heatmap`),
+  scheduleEvent: (eventId, data) => api.post(`/events/${eventId}/schedule`, data),
+  closeEvent: (eventId) => api.post(`/events/${eventId}/close`),
+  reopenEvent: (eventId) => api.post(`/events/${eventId}/reopen`),
 };
 
 export default api;

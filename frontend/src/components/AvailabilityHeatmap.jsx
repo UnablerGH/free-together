@@ -3,15 +3,11 @@ import {
   Box,
   Typography,
   Paper,
-  Tooltip,
   Chip,
-  List,
-  ListItem,
-  ListItemText,
-  useTheme,
+  Tooltip,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23
 
 const formatHour = (hour) => {
@@ -21,133 +17,142 @@ const formatHour = (hour) => {
   return `${hour - 12} PM`;
 };
 
-const getIntensityColor = (count, maxCount, theme) => {
-  if (count === 0) {
-    // Return the current theme's background color
-    return theme.palette.mode === 'dark' 
-      ? theme.palette.background.paper 
-      : theme.palette.background.paper;
+const generateDateRange = (startDate, endDate) => {
+  if (!startDate || !endDate) {
+    // Fallback to generic weekdays if no date range provided
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({
+      displayName: day,
+      key: day.toLowerCase(),
+      date: null
+    }));
+  }
+
+  const dates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Generate all dates in the range
+  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const dayNumber = date.getDate();
+    const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+    
+    dates.push({
+      displayName: `${dayName} ${dayNumber} ${monthName}`,
+      key: `${dayName.toLowerCase()}_${date.toISOString().split('T')[0]}`, // e.g., "monday_2024-05-26"
+      date: new Date(date),
+      dayOfWeek: dayName.toLowerCase()
+    });
   }
   
-  const intensity = count / maxCount;
-  const baseColor = theme.palette.primary.main;
-  
-  // Convert hex to RGB for alpha blending
-  const hex = baseColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  
-  // Create intensity-based alpha with better contrast for dark mode
-  const minAlpha = theme.palette.mode === 'dark' ? 0.3 : 0.2;
-  const maxAlpha = theme.palette.mode === 'dark' ? 0.9 : 0.8;
-  const alpha = minAlpha + (intensity * (maxAlpha - minAlpha));
-  
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return dates;
 };
 
-export default function AvailabilityHeatmap({ heatmapData, userResponses = [], maxCount = 0 }) {
+export default function AvailabilityHeatmap({ heatmapData, userResponses = [], startDate = null, endDate = null }) {
   const theme = useTheme();
 
-  const getSlotData = (day, hour) => {
-    const dayData = heatmapData?.find(d => d.day.toLowerCase() === day.toLowerCase());
-    return dayData?.slots?.find(s => s.hour === hour) || { count: 0, slot: `${day.toLowerCase()}_${hour}` };
+  // Generate the date range based on start and end dates
+  const dateRange = generateDateRange(startDate, endDate);
+
+  const getSlotInfo = (dayKey, hour) => {
+    // For new date-based keys, we need to match against the slot key in heatmap data
+    const slotKey = `${dayKey}_${hour}`;
+    
+    // Find the slot data by searching through all days and slots
+    for (const dayData of heatmapData?.heatmapGrid || []) {
+      const slot = dayData.slots?.find(s => {
+        const expectedKey = `${dayData.day}_${s.hour}`;
+        return expectedKey === slotKey || s.slot === slotKey;
+      });
+      if (slot) return slot;
+    }
+    
+    return { count: 0, maybeCount: 0 };
   };
 
-  const getTooltipContent = (day, hour) => {
-    const slotData = getSlotData(day, hour);
-    const availableUsers = userResponses.filter(user => 
-      user.timeSlots?.includes(slotData.slot)
-    );
+  const getSlotUsers = (dayKey, hour) => {
+    const slotKey = `${dayKey}_${hour}`;
+    const available = userResponses.filter(user => 
+      user.timeSlots?.includes(slotKey)
+    ).map(user => user.userName);
     
-    return (
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {day} {formatHour(hour)}
-        </Typography>
-        <Typography variant="body2">
-          {slotData.count} of {userResponses.length} available
-        </Typography>
-        {availableUsers.length > 0 && (
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              Available:
-            </Typography>
-            {availableUsers.map((user, index) => (
-              <Typography key={index} variant="caption" sx={{ display: 'block' }}>
-                • {user.userName}
-              </Typography>
-            ))}
-          </Box>
-        )}
-      </Box>
-    );
+    const maybe = userResponses.filter(user => 
+      user.maybeSlots?.includes(slotKey)
+    ).map(user => user.userName);
+
+    return { available, maybe };
   };
+
+  const getSlotColor = (count, maybeCount, maxCount, maxMaybeCount) => {
+    if (count === 0 && maybeCount === 0) {
+      return theme.palette.mode === 'dark' ? '#2c2c2c' : '#f5f5f5';
+    }
+
+    // Prioritize available (green) over maybe (yellow)
+    if (count > 0) {
+      const intensity = count / Math.max(maxCount, 1);
+      const alpha = Math.max(0.3, intensity);
+      return `rgba(29, 185, 84, ${alpha})`;
+    } else if (maybeCount > 0) {
+      const intensity = maybeCount / Math.max(maxMaybeCount, 1);
+      const alpha = Math.max(0.3, intensity);
+      return `rgba(255, 152, 0, ${alpha})`;
+    }
+
+    return theme.palette.mode === 'dark' ? '#2c2c2c' : '#f5f5f5';
+  };
+
+  const maxCount = heatmapData?.maxCount || 0;
+  const maxMaybeCount = heatmapData?.maxMaybeCount || 0;
 
   return (
     <Paper elevation={0} className="glass" sx={{ p: 3, border: '1px solid rgba(29, 185, 84, 0.2)' }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Availability Heatmap
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Darker green = more people available. Hover over time slots to see details.
-        </Typography>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Total Responses: {userResponses.length}
+      <Typography variant="h6" gutterBottom>
+        Availability Overview
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Green = Available, Yellow = Maybe Available. Darker colors indicate more responses.
+      </Typography>
+
+      {/* Summary */}
+      {userResponses.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Response Summary ({userResponses.length} people responded)
           </Typography>
-          {maxCount > 0 && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Legend:
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <Box 
-                    sx={{ 
-                      width: 16, 
-                      height: 16, 
-                      backgroundColor: 'background.paper',
-                      border: '1px solid',
-                      borderColor: 'divider'
-                    }} 
-                  />
-                  <Typography variant="caption">0</Typography>
-                  <Box 
-                    sx={{ 
-                      width: 16, 
-                      height: 16, 
-                      backgroundColor: getIntensityColor(maxCount, maxCount, theme),
-                      border: '1px solid',
-                      borderColor: 'divider'
-                    }} 
-                  />
-                  <Typography variant="caption">{maxCount}</Typography>
-              </Box>
-            </Box>
-          )}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {userResponses.map((user, index) => (
+              <Chip 
+                key={index}
+                label={user.userName}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: '0.75rem' }}
+              />
+            ))}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       <Box sx={{ overflowX: 'auto' }}>
-        <Box sx={{ minWidth: '800px' }}>
-          {/* Header with days */}
+        <Box sx={{ minWidth: `${Math.max(800, dateRange.length * 120)}px` }}>
+          {/* Header with dates */}
           <Box sx={{ display: 'flex', mb: 1 }}>
             <Box sx={{ width: '60px', flexShrink: 0 }}></Box>
-            {DAYS.map(day => (
+            {dateRange.map(dateInfo => (
               <Box 
-                key={day}
+                key={dateInfo.key}
                 sx={{ 
                   flex: 1, 
                   textAlign: 'center', 
                   py: 1,
                   fontWeight: 600,
-                  fontSize: '0.875rem',
-                  color: 'text.primary'
+                  fontSize: '0.75rem',
+                  color: 'text.primary',
+                  minWidth: '120px'
                 }}
               >
-                {day}
+                {dateInfo.displayName}
               </Box>
             ))}
           </Box>
@@ -169,31 +174,61 @@ export default function AvailabilityHeatmap({ heatmapData, userResponses = [], m
                 {formatHour(hour)}
               </Box>
               
-              {/* Day slots */}
-              {DAYS.map(day => {
-                const slotData = getSlotData(day, hour);
+              {/* Date slots */}
+              {dateRange.map(dateInfo => {
+                const slotInfo = getSlotInfo(dateInfo.key, hour);
+                const slotUsers = getSlotUsers(dateInfo.key, hour);
+                const color = getSlotColor(slotInfo.count, slotInfo.maybeCount, maxCount, maxMaybeCount);
+                
+                const tooltipContent = (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      {dateInfo.displayName} {formatHour(hour)}
+                    </Typography>
+                    {slotUsers.available.length > 0 && (
+                      <Box sx={{ mb: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#1DB954', fontWeight: 'bold' }}>
+                          Available ({slotUsers.available.length}):
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          {slotUsers.available.join(', ')}
+                        </Typography>
+                      </Box>
+                    )}
+                    {slotUsers.maybe.length > 0 && (
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#ff9800', fontWeight: 'bold' }}>
+                          Maybe ({slotUsers.maybe.length}):
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          {slotUsers.maybe.join(', ')}
+                        </Typography>
+                      </Box>
+                    )}
+                    {slotUsers.available.length === 0 && slotUsers.maybe.length === 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        No responses
+                      </Typography>
+                    )}
+                  </Box>
+                );
+
                 return (
-                  <Tooltip 
-                    key={`${day}_${hour}`}
-                    title={getTooltipContent(day, hour)}
-                    arrow
-                    placement="top"
-                  >
+                  <Tooltip key={`${dateInfo.key}_${hour}`} title={tooltipContent} arrow>
                     <Box
                       sx={{
                         flex: 1,
                         height: '24px',
                         border: '1px solid',
                         borderColor: 'divider',
-                        backgroundColor: getIntensityColor(slotData.count, maxCount, theme),
+                        backgroundColor: color,
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
+                        minWidth: '120px',
                         '&:hover': {
                           transform: 'scale(1.05)',
                           zIndex: 1,
-                          boxShadow: theme.palette.mode === 'dark' 
-                            ? '0 2px 8px rgba(255,255,255,0.15)' 
-                            : '0 2px 8px rgba(0,0,0,0.15)',
+                          boxShadow: 1,
                         }
                       }}
                     />
@@ -205,28 +240,45 @@ export default function AvailabilityHeatmap({ heatmapData, userResponses = [], m
         </Box>
       </Box>
 
-      {/* User responses summary */}
-      {userResponses.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Responses Summary
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {userResponses.map((user, index) => (
-              <Chip
-                key={index}
-                label={`${user.userName} (${user.timeSlots?.length || 0} slots)`}
-                variant="outlined"
-                size="small"
-                sx={{
-                  borderColor: 'primary.main',
-                  color: 'primary.main',
-                }}
-              />
-            ))}
-          </Box>
+      {/* Legend */}
+      <Box sx={{ mt: 3, display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box 
+            sx={{ 
+              width: 16, 
+              height: 16, 
+              backgroundColor: 'rgba(29, 185, 84, 0.7)',
+              border: '1px solid',
+              borderColor: 'divider'
+            }} 
+          />
+          <Typography variant="caption">Available</Typography>
         </Box>
-      )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box 
+            sx={{ 
+              width: 16, 
+              height: 16, 
+              backgroundColor: 'rgba(255, 152, 0, 0.7)',
+              border: '1px solid',
+              borderColor: 'divider'
+            }} 
+          />
+          <Typography variant="caption">Maybe</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box 
+            sx={{ 
+              width: 16, 
+              height: 16, 
+              backgroundColor: theme.palette.mode === 'dark' ? '#2c2c2c' : '#f5f5f5',
+              border: '1px solid',
+              borderColor: 'divider'
+            }} 
+          />
+          <Typography variant="caption">No responses</Typography>
+        </Box>
+      </Box>
     </Paper>
   );
 } 

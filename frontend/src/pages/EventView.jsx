@@ -12,11 +12,19 @@ import {
   Snackbar,
   Tabs,
   Tab,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
   Schedule as ScheduleIcon,
   BarChart as BarChartIcon,
+  Close as CloseIcon,
+  Check as CheckIcon,
+  Replay as ReplayIcon,
 } from '@mui/icons-material';
 import { eventsAPI } from '../api';
 import InviteDialog from '../components/InviteDialog';
@@ -37,8 +45,15 @@ export default function EventView() {
   
   // Time slot selection state
   const [selectedSlots, setSelectedSlots] = useState([]);
+  const [maybeSlots, setMaybeSlots] = useState([]);
   const [submittingSlots, setSubmittingSlots] = useState(false);
   const [userResponse, setUserResponse] = useState(null);
+  
+  // Scheduling state
+  const [schedulingEvent, setSchedulingEvent] = useState(false);
+  const [closingEvent, setClosingEvent] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
 
   useEffect(() => {
     loadEventData();
@@ -65,6 +80,7 @@ export default function EventView() {
       if (currentUserResponse) {
         setUserResponse(currentUserResponse);
         setSelectedSlots(currentUserResponse.timeSlots || []);
+        setMaybeSlots(currentUserResponse.maybeSlots || []);
       }
       
       setError(null);
@@ -77,7 +93,7 @@ export default function EventView() {
   };
 
   const handleSlotsSubmit = async () => {
-    if (selectedSlots.length === 0) {
+    if (selectedSlots.length === 0 && maybeSlots.length === 0) {
       setError('Please select at least one time slot');
       return;
     }
@@ -86,6 +102,7 @@ export default function EventView() {
       setSubmittingSlots(true);
       await eventsAPI.submitResponse(eventId, {
         timeSlots: selectedSlots,
+        maybeSlots: maybeSlots,
       });
       
       setSuccessMessage('Your availability has been submitted successfully!');
@@ -114,6 +131,53 @@ export default function EventView() {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+
+  const handleScheduleEvent = async () => {
+    if (!scheduleDate || !scheduleTime) {
+      setError('Please provide both date and time for the event');
+      return;
+    }
+
+    try {
+      setSchedulingEvent(true);
+      await eventsAPI.scheduleEvent(eventId, {
+        scheduledDate: scheduleDate,
+        scheduledTime: scheduleTime,
+      });
+      setSuccessMessage('Event scheduled successfully!');
+      await loadEventData();
+    } catch (err) {
+      setError('Failed to schedule event');
+      console.error(err);
+    } finally {
+      setSchedulingEvent(false);
+    }
+  };
+
+  const handleCloseEvent = async () => {
+    try {
+      setClosingEvent(true);
+      await eventsAPI.closeEvent(eventId);
+      setSuccessMessage('Event closed - no more responses will be accepted');
+      await loadEventData();
+    } catch (err) {
+      setError('Failed to close event');
+      console.error(err);
+    } finally {
+      setClosingEvent(false);
+    }
+  };
+
+  const handleReopenEvent = async () => {
+    try {
+      await eventsAPI.reopenEvent(eventId);
+      setSuccessMessage('Event reopened for availability collection');
+      await loadEventData();
+    } catch (err) {
+      setError('Failed to reopen event');
+      console.error(err);
+    }
   };
 
   if (loading) {
@@ -178,6 +242,22 @@ export default function EventView() {
                 color="secondary"
                 sx={{ mr: 1 }}
               />
+              <Chip
+                label={event.status || 'collecting'}
+                color={
+                  event.status === 'scheduled' ? 'success' :
+                  event.status === 'closed' ? 'warning' :
+                  'info'
+                }
+                sx={{ mr: 1 }}
+              />
+              {event.status === 'scheduled' && event.scheduledDate && (
+                <Chip
+                  label={`Scheduled: ${event.scheduledDate} at ${event.scheduledTime}`}
+                  color="success"
+                  variant="outlined"
+                />
+              )}
             </Box>
             <Typography variant="body1" color="text.secondary">
               When2Meet-style scheduling - select your available time slots
@@ -193,14 +273,92 @@ export default function EventView() {
             )}
           </Box>
           {event.isOwner && (
-            <Button
-              variant="contained"
-              startIcon={<PersonAddIcon />}
-              onClick={() => setInviteDialogOpen(true)}
-              sx={{ ml: 2 }}
-            >
-              Invite People
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<PersonAddIcon />}
+                onClick={() => setInviteDialogOpen(true)}
+                disabled={event.status === 'scheduled'}
+                sx={{
+                  backgroundColor: 'primary.main',
+                  color: 'white',
+                  fontWeight: 600,
+                  boxShadow: 2,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    boxShadow: 4,
+                    transform: 'translateY(-1px)',
+                  },
+                  '&:disabled': {
+                    backgroundColor: 'action.disabled',
+                    color: 'action.disabled',
+                  }
+                }}
+              >
+                Invite People
+              </Button>
+              
+              {event.status === 'collecting' && (
+                <Button
+                  variant="outlined"
+                  startIcon={<CloseIcon />}
+                  onClick={handleCloseEvent}
+                  disabled={closingEvent}
+                  color="warning"
+                  sx={{
+                    fontWeight: 600,
+                    borderWidth: 2,
+                    '&:hover': {
+                      borderWidth: 2,
+                      transform: 'translateY(-1px)',
+                      boxShadow: 2,
+                    }
+                  }}
+                >
+                  {closingEvent ? 'Closing...' : 'Close Pool'}
+                </Button>
+              )}
+              
+              {(event.status === 'closed' || event.status === 'collecting') && (
+                <Button
+                  variant="outlined"
+                  startIcon={<CheckIcon />}
+                  onClick={() => setSchedulingEvent(true)}
+                  color="success"
+                  sx={{
+                    fontWeight: 600,
+                    borderWidth: 2,
+                    '&:hover': {
+                      borderWidth: 2,
+                      transform: 'translateY(-1px)',
+                      boxShadow: 2,
+                    }
+                  }}
+                >
+                  Schedule Event
+                </Button>
+              )}
+              
+              {event.status === 'scheduled' && (
+                <Button
+                  variant="outlined"
+                  startIcon={<ReplayIcon />}
+                  onClick={handleReopenEvent}
+                  color="info"
+                  sx={{
+                    fontWeight: 600,
+                    borderWidth: 2,
+                    '&:hover': {
+                      borderWidth: 2,
+                      transform: 'translateY(-1px)',
+                      boxShadow: 2,
+                    }
+                  }}
+                >
+                  Reopen Pool
+                </Button>
+              )}
+            </Box>
           )}
         </Box>
 
@@ -237,7 +395,19 @@ export default function EventView() {
         {/* Availability Selection Tab (for invited users) */}
         {isInvited && !event.isOwner && activeTab === 0 && (
           <Box>
-            {userResponse && (
+            {event.status === 'scheduled' && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                This event has been scheduled and no longer accepts availability changes.
+              </Alert>
+            )}
+            
+            {event.status === 'closed' && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Availability collection has been closed by the event owner.
+              </Alert>
+            )}
+            
+            {userResponse && event.status === 'collecting' && (
               <Alert severity="info" sx={{ mb: 3 }}>
                 You have already submitted your availability. You can update it below.
               </Alert>
@@ -245,25 +415,64 @@ export default function EventView() {
             
             <TimeSlotSelector
               selectedSlots={selectedSlots}
+              maybeSlots={maybeSlots}
               onSlotsChange={setSelectedSlots}
-              disabled={submittingSlots}
+              onMaybeSlotsChange={setMaybeSlots}
+              disabled={submittingSlots || event.status !== 'collecting'}
+              startDate={event.startDate}
+              endDate={event.endDate}
             />
             
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
               <Button
                 variant="contained"
                 onClick={handleSlotsSubmit}
-                disabled={submittingSlots || selectedSlots.length === 0}
+                disabled={
+                  submittingSlots || 
+                  (selectedSlots.length === 0 && maybeSlots.length === 0) ||
+                  event.status !== 'collecting'
+                }
                 size="large"
+                sx={{
+                  backgroundColor: 'primary.main',
+                  color: 'white',
+                  fontWeight: 600,
+                  px: 4,
+                  py: 1.5,
+                  boxShadow: 2,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    boxShadow: 4,
+                    transform: 'translateY(-1px)',
+                  },
+                  '&:disabled': {
+                    backgroundColor: 'action.disabled',
+                    color: 'text.disabled',
+                  }
+                }}
               >
                 {submittingSlots ? 'Submitting...' : userResponse ? 'Update Availability' : 'Submit Availability'}
               </Button>
               
-              {selectedSlots.length > 0 && (
+              {(selectedSlots.length > 0 || maybeSlots.length > 0) && event.status === 'collecting' && (
                 <Button
                   variant="outlined"
-                  onClick={() => setSelectedSlots([])}
+                  onClick={() => {
+                    setSelectedSlots([]);
+                    setMaybeSlots([]);
+                  }}
                   disabled={submittingSlots}
+                  sx={{
+                    fontWeight: 600,
+                    borderWidth: 2,
+                    px: 3,
+                    py: 1.5,
+                    '&:hover': {
+                      borderWidth: 2,
+                      transform: 'translateY(-1px)',
+                      boxShadow: 2,
+                    }
+                  }}
                 >
                   Clear All
                 </Button>
@@ -277,9 +486,10 @@ export default function EventView() {
           <Box>
             {heatmapData ? (
               <AvailabilityHeatmap
-                heatmapData={heatmapData.heatmapGrid}
+                heatmapData={heatmapData}
                 userResponses={heatmapData.userResponses}
-                maxCount={heatmapData.maxCount}
+                startDate={event.startDate}
+                endDate={event.endDate}
               />
             ) : (
               <Paper elevation={0} className="glass" sx={{ p: 4, textAlign: 'center', border: '1px solid rgba(29, 185, 84, 0.2)' }}>
@@ -305,6 +515,11 @@ export default function EventView() {
                   <Typography variant="body1" sx={{ mb: 1 }}>
                     <strong>Timezone:</strong> {event.timezone}
                   </Typography>
+                  {event.startDate && event.endDate && (
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Date Range:</strong> {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
+                    </Typography>
+                  )}
                   {!event.isOwner && (
                     <Typography variant="body1" sx={{ mb: 1 }}>
                       <strong>Event Owner:</strong> {event.ownerEmail || 'Unknown'}
@@ -383,6 +598,46 @@ export default function EventView() {
         onInvite={handleInvite}
         eventName={event.name}
       />
+
+      {/* Schedule Event Dialog */}
+      <Dialog open={schedulingEvent} onClose={() => setSchedulingEvent(false)}>
+        <DialogTitle>Schedule Event</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Set a specific date and time for this event. This will close availability collection.
+          </Typography>
+          <TextField
+            margin="dense"
+            label="Date"
+            type="date"
+            fullWidth
+            variant="outlined"
+            value={scheduleDate}
+            onChange={(e) => setScheduleDate(e.target.value)}
+            InputLabelProps={{
+              shrink: true,
+            }}
+          />
+          <TextField
+            margin="dense"
+            label="Time"
+            type="time"
+            fullWidth
+            variant="outlined"
+            value={scheduleTime}
+            onChange={(e) => setScheduleTime(e.target.value)}
+            InputLabelProps={{
+              shrink: true,
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSchedulingEvent(false)}>Cancel</Button>
+          <Button onClick={handleScheduleEvent} variant="contained" color="success">
+            Schedule Event
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Success Snackbar */}
       <Snackbar
