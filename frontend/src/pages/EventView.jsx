@@ -25,11 +25,13 @@ import {
   Close as CloseIcon,
   Check as CheckIcon,
   Replay as ReplayIcon,
+  Event as CalendarIcon,
 } from '@mui/icons-material';
 import { eventsAPI } from '../api';
 import InviteDialog from '../components/InviteDialog';
 import TimeSlotSelector from '../components/TimeSlotSelector';
 import AvailabilityHeatmap from '../components/AvailabilityHeatmap';
+import CalendarIntegration from '../components/CalendarIntegration';
 
 export default function EventView() {
   const { eventId } = useParams();
@@ -54,6 +56,9 @@ export default function EventView() {
   const [closingEvent, setClosingEvent] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
+  
+  // Calendar integration state
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   useEffect(() => {
     loadEventData();
@@ -259,6 +264,28 @@ export default function EventView() {
                 />
               )}
             </Box>
+            
+            {/* Add to Calendar button for scheduled events */}
+            {event.status === 'scheduled' && event.scheduledDate && event.scheduledTime && (
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<CalendarIcon />}
+                  onClick={() => setCalendarDialogOpen(true)}
+                  sx={{
+                    backgroundColor: 'success.main',
+                    color: 'white',
+                    fontWeight: 600,
+                    '&:hover': {
+                      backgroundColor: 'success.dark',
+                      transform: 'translateY(-1px)',
+                    }
+                  }}
+                >
+                  Add to Calendar
+                                 </Button>
+               </Box>
+             )}
             <Typography variant="body1" color="text.secondary">
               When2Meet-style scheduling - select your available time slots
             </Typography>
@@ -485,12 +512,14 @@ export default function EventView() {
         {((isInvited && !event.isOwner && activeTab === 1) || (event.isOwner && activeTab === 0) || (!isInvited)) && (
           <Box>
             {heatmapData ? (
-              <AvailabilityHeatmap
-                heatmapData={heatmapData}
-                userResponses={heatmapData.userResponses}
-                startDate={event.startDate}
-                endDate={event.endDate}
-              />
+              <Box>
+                <AvailabilityHeatmap
+                  heatmapData={heatmapData}
+                  userResponses={heatmapData.userResponses}
+                  startDate={event.startDate}
+                  endDate={event.endDate}
+                />
+              </Box>
             ) : (
               <Paper elevation={0} className="glass" sx={{ p: 4, textAlign: 'center', border: '1px solid rgba(29, 185, 84, 0.2)' }}>
                 <Typography variant="h6" color="text.secondary">
@@ -638,6 +667,15 @@ export default function EventView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Calendar Integration Dialog */}
+      {event && (
+        <CalendarIntegration
+          event={event}
+          open={calendarDialogOpen}
+          onClose={() => setCalendarDialogOpen(false)}
+        />
+      )}
 
       {/* Success Snackbar */}
       <Snackbar

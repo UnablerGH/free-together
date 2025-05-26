@@ -159,6 +159,60 @@ export default function TimeSlotSelector({
     onMaybeSlotsChange([]);
   };
 
+  const getCustomTimeSettings = () => {
+    const savedSettings = localStorage.getItem('freetogether-time-settings');
+    if (savedSettings) {
+      try {
+        return JSON.parse(savedSettings);
+      } catch (error) {
+        console.error('Error loading time settings:', error);
+      }
+    }
+    return {
+      businessStart: '09:00',
+      businessEnd: '17:00',
+      eveningStart: '18:00',
+      eveningEnd: '22:00',
+    };
+  };
+
+  const selectTimeRange = (startHour, endHour) => {
+    const rangeSlots = [];
+    dateRange.forEach(dateInfo => {
+      for (let hour = startHour; hour <= endHour; hour++) {
+        rangeSlots.push(getSlotKey(dateInfo.key, hour));
+      }
+    });
+    
+    if (currentSelectionType === 'available') {
+      // Remove from maybe slots and add to available
+      const newMaybeSlots = maybeSlots.filter(slot => !rangeSlots.includes(slot));
+      const newSelectedSlots = [...new Set([...selectedSlots, ...rangeSlots])];
+      onSlotsChange(newSelectedSlots);
+      onMaybeSlotsChange(newMaybeSlots);
+    } else {
+      // Remove from available slots and add to maybe
+      const newSelectedSlots = selectedSlots.filter(slot => !rangeSlots.includes(slot));
+      const newMaybeSlots = [...new Set([...maybeSlots, ...rangeSlots])];
+      onSlotsChange(newSelectedSlots);
+      onMaybeSlotsChange(newMaybeSlots);
+    }
+  };
+
+  const selectBusinessHours = () => {
+    const settings = getCustomTimeSettings();
+    const startHour = parseInt(settings.businessStart.split(':')[0]);
+    const endHour = parseInt(settings.businessEnd.split(':')[0]);
+    selectTimeRange(startHour, endHour);
+  };
+
+  const selectEveningHours = () => {
+    const settings = getCustomTimeSettings();
+    const startHour = parseInt(settings.eveningStart.split(':')[0]);
+    const endHour = parseInt(settings.eveningEnd.split(':')[0]);
+    selectTimeRange(startHour, endHour);
+  };
+
   return (
     <Paper elevation={0} className="glass" sx={{ p: 3, border: '1px solid rgba(29, 185, 84, 0.2)' }}>
       <Box sx={{ mb: 3 }}>
@@ -215,6 +269,10 @@ export default function TimeSlotSelector({
           >
             Maybe (Yellow)
           </Button>
+        </Box>
+
+        {/* Quick Selection Tools */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
           <Button 
             variant="outlined" 
             size="small" 
@@ -246,6 +304,38 @@ export default function TimeSlotSelector({
             }}
           >
             Clear All
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={selectBusinessHours}
+            disabled={disabled}
+            sx={{
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
+          >
+            Business Hours
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={selectEveningHours}
+            disabled={disabled}
+            sx={{
+              fontWeight: 600,
+              borderWidth: 2,
+              '&:hover': {
+                borderWidth: 2,
+                transform: 'translateY(-1px)',
+              }
+            }}
+          >
+            Evening
           </Button>
         </Box>
 

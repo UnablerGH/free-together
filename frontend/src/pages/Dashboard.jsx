@@ -18,9 +18,11 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Help as HelpIcon,
+  Event as CalendarIcon,
 } from '@mui/icons-material';
 import { eventsAPI } from '../api';
 import InviteDialog from '../components/InviteDialog';
+import CalendarIntegration from '../components/CalendarIntegration';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -31,6 +33,8 @@ export default function Dashboard() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
+  const [calendarEvent, setCalendarEvent] = useState(null);
 
   useEffect(() => {
     loadEvents();
@@ -76,6 +80,11 @@ export default function Dashboard() {
 
   const handleCloseSuccessMessage = () => {
     setSuccessMessage('');
+  };
+
+  const handleCalendarClick = (event) => {
+    setCalendarEvent(event);
+    setCalendarDialogOpen(true);
   };
 
   const getUserRsvpStatus = (event) => {
@@ -167,8 +176,12 @@ export default function Dashboard() {
                 )}
                 <Box sx={{ mt: 1 }}>
                   <Chip
-                    label={event.closed ? 'Closed' : 'Open'}
-                    color={event.closed ? 'error' : 'success'}
+                    label={event.status || 'collecting'}
+                    color={
+                      event.status === 'scheduled' ? 'success' :
+                      event.status === 'closed' ? 'warning' :
+                      'info'
+                    }
                     size="small"
                   />
                   <Chip
@@ -179,8 +192,15 @@ export default function Dashboard() {
                   />
                   {!event.isOwner && getRsvpChip(getUserRsvpStatus(event))}
                 </Box>
+                
+                {/* Show scheduled date/time if available */}
+                {event.status === 'scheduled' && event.scheduledDate && event.scheduledTime && (
+                  <Typography variant="body2" color="success.main" sx={{ mt: 1, fontWeight: 600 }}>
+                    📅 {new Date(`${event.scheduledDate}T${event.scheduledTime}`).toLocaleString()}
+                  </Typography>
+                )}
               </CardContent>
-              <CardActions>
+              <CardActions sx={{ flexWrap: 'wrap', gap: 1 }}>
                 <Button
                   size="small"
                   color="primary"
@@ -188,7 +208,7 @@ export default function Dashboard() {
                 >
                   View Details
                 </Button>
-                {event.isOwner && (
+                {event.isOwner && event.status !== 'scheduled' && (
                   <Button
                     size="small"
                     color="secondary"
@@ -196,6 +216,16 @@ export default function Dashboard() {
                     onClick={() => handleInviteClick(event)}
                   >
                     Invite
+                  </Button>
+                )}
+                {event.status === 'scheduled' && event.scheduledDate && event.scheduledTime && (
+                  <Button
+                    size="small"
+                    color="success"
+                    startIcon={<CalendarIcon />}
+                    onClick={() => handleCalendarClick(event)}
+                  >
+                    Add to Calendar
                   </Button>
                 )}
               </CardActions>
@@ -211,6 +241,15 @@ export default function Dashboard() {
         onInvite={handleInvite}
         eventName={selectedEvent?.name || ''}
       />
+
+      {/* Calendar Integration Dialog */}
+      {calendarEvent && (
+        <CalendarIntegration
+          event={calendarEvent}
+          open={calendarDialogOpen}
+          onClose={() => setCalendarDialogOpen(false)}
+        />
+      )}
 
       {/* Success Snackbar */}
       <Snackbar

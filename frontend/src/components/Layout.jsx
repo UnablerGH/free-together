@@ -17,10 +17,12 @@ import {
   AccountCircle, 
   Add, 
   LightMode, 
-  DarkMode 
+  DarkMode,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../contexts/ThemeContext';
+import Settings from './Settings';
 import logo from '../images/logo.png';
 
 export default function Layout() {
@@ -28,6 +30,7 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const { isDarkMode, toggleTheme } = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -106,6 +109,21 @@ export default function Layout() {
             Profile
           </Button>
           
+          <Tooltip title="Settings">
+            <IconButton
+              onClick={() => setSettingsOpen(true)}
+              sx={{
+                mr: 1,
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'rgba(29, 185, 84, 0.1)'
+                }
+              }}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+          
           <Tooltip title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
             <IconButton
               onClick={toggleTheme}
@@ -170,6 +188,12 @@ export default function Layout() {
       >
         <Outlet />
       </Container>
+      
+      {/* Settings Dialog */}
+      <Settings 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+      />
     </Box>
   );
 } 
