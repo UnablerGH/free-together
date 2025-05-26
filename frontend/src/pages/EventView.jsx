@@ -14,8 +14,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Snackbar,
 } from '@mui/material';
+import {
+  PersonAdd as PersonAddIcon,
+} from '@mui/icons-material';
 import { eventsAPI } from '../api';
+import InviteDialog from '../components/InviteDialog';
 
 const AVAILABILITY_LEVELS = [
   { value: 0, label: 'Not Available', color: 'error' },
@@ -32,6 +37,8 @@ export default function EventView() {
   const [error, setError] = useState(null);
   const [availability, setAvailability] = useState({});
   const [comments, setComments] = useState({});
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     loadEventData();
@@ -87,6 +94,20 @@ export default function EventView() {
     }
   };
 
+  const handleInvite = async (emails) => {
+    try {
+      const response = await eventsAPI.inviteUsers(eventId, { emails });
+      setSuccessMessage(`Successfully invited ${emails.length} user${emails.length !== 1 ? 's' : ''}`);
+      await loadEventData(); // Refresh event data to show updated invitees
+    } catch (err) {
+      throw new Error(err.response?.data?.error || 'Failed to send invitations');
+    }
+  };
+
+  const handleCloseSuccessMessage = () => {
+    setSuccessMessage('');
+  };
+
   if (loading) {
     return (
       <Container>
@@ -114,24 +135,38 @@ export default function EventView() {
   return (
     <Container>
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          {event.name}
-        </Typography>
-        <Box sx={{ mb: 3 }}>
-          <Chip
-            label={event.type}
-            color="primary"
-            sx={{ mr: 1 }}
-          />
-          <Chip
-            label={event.timezone}
-            color="secondary"
-            sx={{ mr: 1 }}
-          />
-          <Chip
-            label={event.access}
-            color={event.access === 'public' ? 'success' : 'warning'}
-          />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              {event.name}
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Chip
+                label={event.type}
+                color="primary"
+                sx={{ mr: 1 }}
+              />
+              <Chip
+                label={event.timezone}
+                color="secondary"
+                sx={{ mr: 1 }}
+              />
+              <Chip
+                label={event.access}
+                color={event.access === 'public' ? 'success' : 'warning'}
+              />
+            </Box>
+          </Box>
+          {event.isOwner && (
+            <Button
+              variant="contained"
+              startIcon={<PersonAddIcon />}
+              onClick={() => setInviteDialogOpen(true)}
+              sx={{ ml: 2 }}
+            >
+              Invite People
+            </Button>
+          )}
         </Box>
 
         <Grid container spacing={3}>
@@ -196,10 +231,48 @@ export default function EventView() {
                   End Date: {new Date(event.end_date).toLocaleString()}
                 </Typography>
               )}
+              
+              {/* Invitees Section */}
+              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                Invited People ({event.invitees?.length || 0})
+              </Typography>
+              {event.invitees && event.invitees.length > 0 ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {event.invitees.map((email, index) => (
+                    <Chip
+                      key={index}
+                      label={email}
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                    />
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No one has been invited yet.
+                </Typography>
+              )}
             </Paper>
           </Grid>
         </Grid>
       </Box>
+
+      {/* Invite Dialog */}
+      <InviteDialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        onInvite={handleInvite}
+        eventName={event.name}
+      />
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={handleCloseSuccessMessage}
+        message={successMessage}
+      />
     </Container>
   );
 } 

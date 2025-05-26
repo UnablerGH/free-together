@@ -43,8 +43,9 @@ def list_events():
 
     # Events I created
     created_q = db.collection('events').where('createdBy', '==', uid).stream()
-    # Events I'm invited to
-    invited_q = db.collection('events').where('invitees', 'array_contains', uid).stream()
+    # Events I'm invited to (by email)
+    user_email = g.current_user.get('email')
+    invited_q = db.collection('events').where('invitees', 'array_contains', user_email).stream() if user_email else []
 
     events = []
     for doc in created_q:
@@ -134,14 +135,39 @@ def invite_user(event_id):
         return jsonify({'message': 'Event not found'}), 404
     if ev.to_dict().get('createdBy') != uid:
         return jsonify({'message': 'Forbidden'}), 403
+    
     data = request.get_json() or {}
-    email = data.get('email')
-    if not email:
-        return jsonify({'message': 'Email is required'}), 400
-    try:
-        user = auth.get_user_by_email(email)
-        invitee_uid = user.uid
-    except auth.UserNotFoundError:
-        return jsonify({'message': 'No user with that email'}), 404
-    doc_ref.update({ 'invitees': ArrayUnion([invitee_uid]) })
-    return jsonify({'message': 'Invited'}), 200
+    
+    # Support both single email and multiple emails
+    emails = data.get('emails', [])
+    single_email = data.get('email')
+    
+    if single_email:
+        emails = [single_email]
+    
+    if not emails:
+        return jsonify({'error': 'No emails provided'}), 400
+    
+    valid_emails = []
+    invalid_emails = []
+    
+    for email in emails:
+        try:
+            # Verify the email corresponds to a real user
+            user = auth.get_user_by_email(email)
+            valid_emails.append(email)
+        except auth.UserNotFoundError:
+            invalid_emails.append(email)
+    
+    if valid_emails:
+        doc_ref.update({ 'invitees': ArrayUnion(valid_emails) })
+    
+    response_message = f'Successfully invited {len(valid_emails)} user(s)'
+    if invalid_emails:
+        response_message += f'. Users not found: {", ".join(invalid_emails)}'
+    
+    return jsonify({
+        'message': response_message,
+        'invited_count': len(valid_emails),
+        'not_found': invalid_emails
+    }), 200

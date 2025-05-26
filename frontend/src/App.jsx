@@ -10,6 +10,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import EventCreate from './pages/EventCreate';
 import EventView from './pages/EventView';
+import Profile from './pages/Profile';
 
 const theme = createTheme({
   palette: {
@@ -43,6 +44,7 @@ function App() {
             }
           >
             <Route index element={<Dashboard />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="events/create" element={<EventCreate />} />
             <Route path="events/:eventId" element={<EventView />} />
           </Route>

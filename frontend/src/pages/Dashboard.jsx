@@ -11,8 +11,13 @@ import {
   Tabs,
   Tab,
   Chip,
+  Snackbar,
 } from '@mui/material';
+import {
+  PersonAdd as PersonAddIcon,
+} from '@mui/icons-material';
 import { eventsAPI } from '../api';
+import InviteDialog from '../components/InviteDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,6 +25,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(0);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     loadEvents();
@@ -47,6 +55,25 @@ export default function Dashboard() {
     if (tab === 0) return event.isOwner;
     return !event.isOwner;
   });
+
+  const handleInviteClick = (event) => {
+    setSelectedEvent(event);
+    setInviteDialogOpen(true);
+  };
+
+  const handleInvite = async (emails) => {
+    try {
+      const response = await eventsAPI.inviteUsers(selectedEvent.eventId, { emails });
+      setSuccessMessage(`Successfully invited ${emails.length} user${emails.length !== 1 ? 's' : ''} to ${selectedEvent.name}`);
+      await loadEvents(); // Refresh events to show updated invitees
+    } catch (err) {
+      throw new Error(err.response?.data?.error || 'Failed to send invitations');
+    }
+  };
+
+  const handleCloseSuccessMessage = () => {
+    setSuccessMessage('');
+  };
 
   return (
     <Box>
@@ -76,6 +103,9 @@ export default function Dashboard() {
                 <Typography color="textSecondary" gutterBottom>
                   Timezone: {event.timezone}
                 </Typography>
+                <Typography color="textSecondary" gutterBottom>
+                  Invitees: {event.invitees?.length || 0}
+                </Typography>
                 <Box sx={{ mt: 1 }}>
                   <Chip
                     label={event.closed ? 'Closed' : 'Open'}
@@ -98,11 +128,37 @@ export default function Dashboard() {
                 >
                   View Details
                 </Button>
+                {event.isOwner && (
+                  <Button
+                    size="small"
+                    color="secondary"
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => handleInviteClick(event)}
+                  >
+                    Invite
+                  </Button>
+                )}
               </CardActions>
             </Card>
           </Grid>
         ))}
       </Grid>
+
+      {/* Invite Dialog */}
+      <InviteDialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        onInvite={handleInvite}
+        eventName={selectedEvent?.name || ''}
+      />
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={handleCloseSuccessMessage}
+        message={successMessage}
+      />
     </Box>
   );
 } 

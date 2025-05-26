@@ -63,12 +63,19 @@ export const authAPI = {
   getCurrentUser: () => api.get('/auth/me'),
 };
 
+// Profile API functions
+export const fetchProfile = async () => {
+  const response = await api.get('/auth/me');
+  return response.data;
+};
+
 export const eventsAPI = {
   createEvent: (data) => api.post('/events', data),
   listEvents: () => api.get('/events'),
   getEvent: (eventId) => api.get(`/events/${eventId}`),
   submitResponse: (eventId, data) => api.post(`/events/${eventId}/responses`, data),
   getResponses: (eventId) => api.get(`/events/${eventId}/responses`),
+  inviteUsers: (eventId, data) => api.post(`/events/${eventId}/invite`, data),
 };
 
 export default api;

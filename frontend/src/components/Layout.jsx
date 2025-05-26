@@ -46,6 +46,12 @@ export default function Layout() {
           >
             New Event
           </Button>
+          <Button
+            color="inherit"
+            onClick={() => navigate('/profile')}
+          >
+            Profile
+          </Button>
           <IconButton
             size="large"
             aria-label="account of current user"
@@ -71,6 +77,9 @@ export default function Layout() {
             open={Boolean(anchorEl)}
             onClose={handleClose}
           >
+            <MenuItem onClick={() => { navigate('/profile'); handleClose(); }}>
+              Profile
+            </MenuItem>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>
           </Menu>
         </Toolbar>
