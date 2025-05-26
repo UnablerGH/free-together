@@ -1,4 +1,8 @@
-Flask
-firebase-admin
-python-dotenv
-pydantic
+Flask==3.0.2
+firebase-admin==6.4.0
+python-dotenv==1.0.1
+pydantic==2.6.3
+flask-cors==4.0.0
+pytest==8.0.2
+python-jose==3.3.0
+requests==2.31.0

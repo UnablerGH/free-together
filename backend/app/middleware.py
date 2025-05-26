@@ -1,19 +1,24 @@
 from functools import wraps
-from flask import request, jsonify, g
-import firebase_admin.auth as firebase_auth
-
+from flask import request, g, jsonify
+import firebase_admin
+from firebase_admin import auth
 
 def auth_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'message':'Unauthorized'}), 401
-        id_token = auth_header.split(' ', 1)[1]
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'No authorization header'}), 401
+
+        token = auth_header.split('Bearer ')[1]
         try:
-            decoded = firebase_auth.verify_id_token(id_token)
-            g.current_user = decoded
-        except Exception:
-            return jsonify({'message':'Invalid or expired token'}), 401
-        return f(*args, **kwargs)
-    return wrapper
+            decoded_token = auth.verify_id_token(token)
+            g.current_user = {
+                'uid': decoded_token['uid'],
+                'email': decoded_token.get('email')
+            }
+            return f(*args, **kwargs)
+        except Exception as e:
+            return jsonify({'error': 'Invalid token'}), 401
+
+    return decorated_function

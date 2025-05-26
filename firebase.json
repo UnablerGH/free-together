@@ -1,9 +1,5 @@
 {
   "emulators": {
-    "apphosting": {
-      "port": 4000,
-      "rootDirectory": "./"
-    },
     "auth": {
       "port": 9099
     },
@@ -12,8 +8,10 @@
     },
     "ui": {
       "enabled": true,
-      "port": 4001
-    },
-    "singleProjectMode": true
+      "port": 4000
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }

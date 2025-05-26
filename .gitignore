@@ -5,3 +5,7 @@ __pycache__/
 firebase-debug.log
 firestore-debug.log
 .pytest_cache/
+node_modules
+*.env
+context.md
+*.rules
