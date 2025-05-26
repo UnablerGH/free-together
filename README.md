@@ -1,107 +1,212 @@
-# FreeTogether
+# FreeTogether 🎉
 
-FreeTogether is a collaborative scheduling platform that helps groups find the best time to meet. It allows users to create events, invite others, and respond with their availability.
+A modern When2Meet-style scheduling application built with React and Flask.
 
-## Features
+## ✨ Features
 
-- User authentication with Firebase
-- Create and manage events
-- Set availability for time slots
-- Add comments to time slots
-- View responses from all participants
-- Support for one-time and weekly events
-- Timezone support
-- Public and restricted access levels
+- **When2Meet-style Interface**: Interactive time slot selection with drag-and-drop
+- **Real-time Availability Heatmap**: Visual representation of group availability
+- **Custom Time Settings**: Define your own business and evening hours
+- **Firebase Authentication**: Secure user management
+- **Event Management**: Create, schedule, and manage events
+- **Calendar Integration**: Export to Google Calendar, Outlook, and ICS files
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark/Light Theme**: Spotify-inspired modern UI with theme switching
 
-## Tech Stack
+## 🚀 Quick Start
 
-### Backend
-- Flask (Python)
-- Firebase Authentication
-- Firebase Firestore
-- Pydantic for data validation
+### Development Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd freetogether
+   ```
+
+2. **Backend Setup**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. **Frontend Setup**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+4. **Environment Configuration**
+   - Create `.env` files in both `backend/` and `frontend/` directories
+   - See `DEPLOYMENT.md` for required environment variables
+
+5. **Run the Application**
+   ```bash
+   # Terminal 1 - Backend
+   cd backend
+   python run.py
+
+   # Terminal 2 - Frontend
+   cd frontend
+   npm run dev
+   ```
+
+## 🌐 Production Deployment
+
+### Quick Deploy (Recommended)
+- **Frontend**: Vercel
+- **Backend**: Railway
+
+### Pre-deployment Check
+Run the deployment helper:
+```bash
+# Windows
+deploy.bat
+
+# Linux/Mac
+./deploy.sh
+```
+
+### Full Deployment Guide
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete step-by-step instructions.
+
+## 🛠️ Tech Stack
 
 ### Frontend
-- React
-- Material-UI
-- Firebase SDK
-- Axios for API calls
-- Zustand for state management
+- **React 18** - Modern React with hooks
+- **Material-UI (MUI)** - Component library
+- **Vite** - Fast build tool
+- **Zustand** - State management
+- **React Router** - Client-side routing
+- **Axios** - HTTP client
 
-## Prerequisites
+### Backend
+- **Flask** - Python web framework
+- **Firebase Admin** - Authentication and database
+- **Pydantic** - Data validation
+- **Flask-CORS** - Cross-origin resource sharing
+- **Gunicorn** - Production WSGI server
 
-- Python 3.8+
-- Node.js 16+
-- Firebase account
-- Firebase project with Authentication and Firestore enabled
+### Database & Auth
+- **Firebase Firestore** - NoSQL database
+- **Firebase Authentication** - User management
 
-## Setup
+## 📁 Project Structure
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/freetogether.git
-cd freetogether
+```
+freetogether/
+├── frontend/                 # React frontend
+│   ├── src/
+│   │   ├── components/      # Reusable components
+│   │   ├── pages/          # Page components
+│   │   ├── contexts/       # React contexts
+│   │   ├── stores/         # Zustand stores
+│   │   └── api.js          # API client
+│   ├── package.json
+│   └── vite.config.js
+├── backend/                 # Flask backend
+│   ├── app/
+│   │   ├── routes/         # API routes
+│   │   ├── events/         # Event-specific logic
+│   │   ├── users/          # User-specific logic
+│   │   └── __init__.py     # App factory
+│   ├── requirements.txt
+│   ├── app.py             # Production entry point
+│   └── Procfile           # Deployment configuration
+├── DEPLOYMENT.md          # Deployment guide
+├── deploy.bat            # Windows deployment helper
+└── deploy.sh             # Linux/Mac deployment helper
 ```
 
-2. Set up the backend:
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+## 🔧 Configuration
+
+### Environment Variables
+
+**Backend (.env)**
+```env
+FIREBASE_CRED_PATH=./serviceAccountKey.json
+FIREBASE_PROJECT_ID=your-firebase-project-id
+SECRET_KEY=your-secret-key
+FLASK_ENV=production
+PORT=5000
 ```
 
-3. Set up the frontend:
-```bash
-cd frontend
-npm install
+**Frontend (.env)**
+```env
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:abcdef
+VITE_API_URL=https://your-backend-url.railway.app/api/v1
 ```
 
-4. Configure Firebase:
-   - Create a new Firebase project
-   - Enable Authentication and Firestore
-   - Download the service account key and save it as `backend/serviceAccountKey.json`
-   - Create a `.env` file in the frontend directory with your Firebase config:
-   ```
-   VITE_FIREBASE_API_KEY=your_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-   VITE_FIREBASE_PROJECT_ID=your_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-   VITE_FIREBASE_APP_ID=your_app_id
-   ```
+## 🎯 Key Features Explained
 
-## Running the Application
+### Time Slot Selection
+- Interactive grid interface similar to When2Meet
+- Support for "Available" and "Maybe" states
+- Drag-and-drop selection
+- Custom business/evening hour presets
 
-1. Start the backend server:
-```bash
-cd backend
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-python run.py
-```
+### Availability Heatmap
+- Color-coded visualization of group availability
+- Hover tooltips showing available users
+- Real-time updates as responses come in
 
-2. Start the frontend development server:
-```bash
-cd frontend
-npm run dev
-```
+### Event Management
+- Create events with date ranges
+- Invite users via email
+- Schedule events based on availability
+- Close/reopen availability collection
 
-3. Open your browser and navigate to `http://localhost:3000`
+### Settings & Customization
+- Custom business hours (default: 9 AM - 5 PM)
+- Custom evening hours (default: 6 PM - 10 PM)
+- Dark/light theme toggle
+- Persistent user preferences
 
-## Development
+## 🔒 Security
 
-- Backend API runs on `http://localhost:5000`
-- Frontend development server runs on `http://localhost:3000`
-- API documentation is available at `http://localhost:5000/api/v1/docs`
+- Firebase Authentication for secure user management
+- JWT token-based API authentication
+- CORS protection
+- Input validation with Pydantic
+- Environment-based configuration
 
-## Contributing
+## 📱 Browser Support
+
+- Chrome (recommended)
+- Firefox
+- Safari
+- Edge
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+If you encounter issues:
+
+1. Check the [DEPLOYMENT.md](./DEPLOYMENT.md) troubleshooting section
+2. Verify all environment variables are set correctly
+3. Check Firebase console for authentication issues
+4. Review browser console for frontend errors
+5. Check server logs for backend issues
+
+## 🎉 Acknowledgments
+
+- Inspired by When2Meet's simple and effective interface
+- Built with modern web technologies for better performance and user experience
+- Designed with accessibility and mobile-first principles
