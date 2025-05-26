@@ -50,7 +50,14 @@ A modern When2Meet-style scheduling application built with React and Flask.
    # Terminal 2 - Frontend
    cd frontend
    npm run dev
+
+
+   # Terminal 3 - firebase emulator
+   after logging to firebase: firebase login globally
+   put secret key in the backend/serviceAccountKey.json file
+   then in ./freetogether/  run firebase emulators:start
    ```
+
 
 ## 🌐 Production Deployment
 
