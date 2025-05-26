@@ -1,9 +1,10 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuthStore } from './stores/authStore';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -12,25 +13,16 @@ import EventCreate from './pages/EventCreate';
 import EventView from './pages/EventView';
 import Profile from './pages/Profile';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
-
 function PrivateRoute({ children }) {
   const { user } = useAuthStore();
   return user ? children : <Navigate to="/login" />;
 }
 
-function App() {
+function AppContent() {
+  const { theme } = useTheme();
+  
   return (
-    <ThemeProvider theme={theme}>
+    <MuiThemeProvider theme={theme}>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -50,6 +42,14 @@ function App() {
           </Route>
         </Routes>
       </LocalizationProvider>
+    </MuiThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }

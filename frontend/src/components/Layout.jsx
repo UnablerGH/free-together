@@ -10,13 +10,23 @@ import {
   Menu,
   MenuItem,
   Container,
+  Avatar,
+  Tooltip,
 } from '@mui/material';
-import { AccountCircle, Add } from '@mui/icons-material';
+import { 
+  AccountCircle, 
+  Add, 
+  LightMode, 
+  DarkMode 
+} from '@mui/icons-material';
 import { useAuthStore } from '../stores/authStore';
+import { useTheme } from '../contexts/ThemeContext';
+import logo from '../images/logo.png';
 
 export default function Layout() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
 
   const handleMenu = (event) => {
@@ -33,32 +43,96 @@ export default function Layout() {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            FreeTogether
-          </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar position="static" elevation={0}>
+        <Toolbar sx={{ px: 3 }}>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              '&:hover': {
+                opacity: 0.8
+              },
+              transition: 'opacity 0.2s ease'
+            }}
+            onClick={() => navigate('/')}
+          >
+            <Avatar 
+              src={logo} 
+              alt="FreeTogether Logo"
+              sx={{ 
+                width: 40, 
+                height: 40, 
+                mr: 2,
+                borderRadius: '8px'
+              }}
+            />
+            <Typography 
+              variant="h5" 
+              component="div" 
+              sx={{ 
+                fontWeight: 900,
+                color: 'primary.main',
+                letterSpacing: '-0.025em'
+              }}
+            >
+              FreeTogether
+            </Typography>
+          </Box>
+          
+          <Box sx={{ flexGrow: 1 }} />
           <Button
-            color="inherit"
+            variant="contained"
             startIcon={<Add />}
             onClick={() => navigate('/events/create')}
+            sx={{ mr: 2 }}
           >
             New Event
           </Button>
           <Button
-            color="inherit"
+            variant="outlined"
             onClick={() => navigate('/profile')}
+            sx={{ 
+              mr: 2,
+              borderColor: 'primary.main',
+              color: 'primary.main',
+              '&:hover': {
+                borderColor: 'primary.light',
+                backgroundColor: 'rgba(29, 185, 84, 0.1)'
+              }
+            }}
           >
             Profile
           </Button>
+          
+          <Tooltip title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <IconButton
+              onClick={toggleTheme}
+              sx={{
+                mr: 1,
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'rgba(29, 185, 84, 0.1)'
+                }
+              }}
+            >
+              {isDarkMode ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
+          
           <IconButton
             size="large"
             aria-label="account of current user"
             aria-controls="menu-appbar"
             aria-haspopup="true"
             onClick={handleMenu}
-            color="inherit"
+            sx={{
+              color: 'primary.main',
+              '&:hover': {
+                backgroundColor: 'rgba(29, 185, 84, 0.1)'
+              }
+            }}
           >
             <AccountCircle />
           </IconButton>
@@ -84,7 +158,16 @@ export default function Layout() {
           </Menu>
         </Toolbar>
       </AppBar>
-      <Container component="main" sx={{ flexGrow: 1, py: 3 }}>
+      <Container 
+        component="main" 
+        maxWidth="xl"
+        sx={{ 
+          flexGrow: 1, 
+          py: 4,
+          px: 3,
+          bgcolor: 'background.default'
+        }}
+      >
         <Outlet />
       </Container>
     </Box>

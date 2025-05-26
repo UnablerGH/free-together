@@ -65,9 +65,20 @@ export default function EventCreate() {
   };
 
   return (
-    <Container maxWidth="sm">
+    <Container maxWidth="sm" className="fade-in">
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
+        <Typography 
+          variant="h3" 
+          gutterBottom
+          sx={{
+            fontWeight: 900,
+            mb: 4,
+            background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
           Create New Event
         </Typography>
         {error && (

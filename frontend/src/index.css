@@ -1,20 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+code {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* Custom scrollbar - Dark mode */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 12px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #1DB954;
+}
+
+/* Custom scrollbar - Light mode */
+[data-theme="light"] ::-webkit-scrollbar {
+  width: 12px;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 6px;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #1DB954;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Material-UI overrides - Dark mode */
+[data-theme="dark"] .MuiDateCalendar-root {
+  background-color: #242424 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .MuiPickersDay-root {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .MuiPickersDay-root:hover {
+  background-color: #1DB954 !important;
+}
+
+[data-theme="dark"] .MuiPickersDay-root.Mui-selected {
+  background-color: #1DB954 !important;
+}
+
+/* Material-UI overrides - Light mode */
+[data-theme="light"] .MuiDateCalendar-root {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme="light"] .MuiPickersDay-root {
+  color: #1a1a1a !important;
+}
+
+[data-theme="light"] .MuiPickersDay-root:hover {
+  background-color: #1DB954 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .MuiPickersDay-root.Mui-selected {
+  background-color: #1DB954 !important;
+  color: #ffffff !important;
+}
+
+/* Better label visibility for both themes */
+[data-theme="dark"] .MuiInputLabel-root {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="light"] .MuiInputLabel-root {
+  color: #555555 !important;
+}
+
+[data-theme="dark"] .MuiFormLabel-root {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="light"] .MuiFormLabel-root {
+  color: #555555 !important;
+}
+
+/* Select dropdown text */
+[data-theme="dark"] .MuiSelect-select {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .MuiSelect-select {
+  color: #1a1a1a !important;
+}
+
+/* Menu items */
+[data-theme="dark"] .MuiMenuItem-root {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .MuiMenuItem-root {
+  color: #1a1a1a !important;
+}
+
+/* Custom utility classes */
+.gradient-bg {
+  background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
+}
+
+.gradient-bg-dark {
+  background: linear-gradient(135deg, #191414 0%, #121212 100%);
+}
+
+.glass {
+  background: rgba(24, 24, 24, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Focus styles */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #1DB954 !important;
+  border-width: 2px !important;
+}
+
+/* Snackbar styling */
+.MuiSnackbar-root .MuiAlert-root {
+  background-color: #282828 !important;
+  color: #ffffff !important;
+}
+
+/* Tab styling */
+.MuiTabs-indicator {
+  background-color: #1DB954 !important;
+}
+
+.MuiTab-root {
+  color: #b3b3b3 !important;
+}
+
+.MuiTab-root.Mui-selected {
+  color: #1DB954 !important;
+}
+
+/* Chip styling improvements */
+.MuiChip-colorSuccess {
+  background-color: #1DB954 !important;
+  color: #ffffff !important;
+}
+
+.MuiChip-colorError {
+  background-color: #e22134 !important;
+  color: #ffffff !important;
+}
+
+.MuiChip-colorWarning {
+  background-color: #ffa726 !important;
+  color: #000000 !important;
 } 

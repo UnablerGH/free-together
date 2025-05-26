@@ -22,8 +22,10 @@ import {
   Person as PersonIcon,
   Email as EmailIcon,
   AccountCircle,
+  Event as EventIcon,
+  Reply as ReplyIcon,
 } from '@mui/icons-material';
-import { fetchProfile } from '../api';
+import { fetchProfile, eventsAPI } from '../api';
 import { useAuthStore } from '../stores/authStore';
 
 export default function Profile() {
@@ -36,6 +38,11 @@ export default function Profile() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [statistics, setStatistics] = useState({
+    eventsCreated: 0,
+    responsesGiven: 0,
+  });
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
   const { user: authUser } = useAuthStore();
 
   useEffect(() => {
@@ -45,12 +52,45 @@ export default function Profile() {
   const loadProfile = async () => {
     try {
       setLoading(true);
-      const profileData = await fetchProfile();
+      const [profileData, eventsData] = await Promise.all([
+        fetchProfile(),
+        eventsAPI.listEvents()
+      ]);
+      
       setUser(profileData);
       setEditForm({
         username: profileData.username || '',
         email: profileData.email || '',
       });
+
+      // Calculate statistics
+      setStatisticsLoading(true);
+      const events = eventsData.data || [];
+      const eventsCreated = events.filter(event => event.isOwner).length;
+      
+      // Count responses given (events where user is not owner but has responded)
+      let responsesGiven = 0;
+      const invitedEvents = events.filter(event => !event.isOwner);
+      
+      for (const event of invitedEvents) {
+        try {
+          const responsesData = await eventsAPI.getResponses(event.eventId);
+          const userResponse = responsesData.data.find(
+            response => response.userId === profileData.uid
+          );
+          if (userResponse && userResponse.rsvpStatus) {
+            responsesGiven++;
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch responses for event ${event.eventId}:`, err);
+        }
+      }
+
+      setStatistics({
+        eventsCreated,
+        responsesGiven,
+      });
+      setStatisticsLoading(false);
     } catch (error) {
       console.error('Error loading profile:', error);
       setError('Failed to load profile data');
@@ -115,8 +155,15 @@ export default function Profile() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
+    <Container maxWidth="md" className="fade-in" sx={{ mt: 4, mb: 4 }}>
+      <Paper 
+        elevation={0}
+        className="glass hover-lift"
+        sx={{ 
+          p: 4,
+          border: '1px solid rgba(29, 185, 84, 0.2)',
+        }}
+      >
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
           <Avatar
@@ -124,14 +171,26 @@ export default function Profile() {
               width: 80,
               height: 80,
               mr: 3,
-              bgcolor: 'primary.main',
+              background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
               fontSize: '2rem',
+              boxShadow: '0 4px 12px rgba(29, 185, 84, 0.4)',
             }}
           >
             {user.username ? user.username.charAt(0).toUpperCase() : <AccountCircle />}
           </Avatar>
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
+            <Typography 
+              variant="h3" 
+              component="h1" 
+              gutterBottom
+              sx={{
+                fontWeight: 900,
+                background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               {editing ? 'Edit Profile' : 'My Profile'}
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -226,35 +285,40 @@ export default function Profile() {
           <Grid item xs={12}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <EventIcon sx={{ mr: 1 }} />
                   Account Statistics
                 </Typography>
                 <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Typography variant="h4" color="primary">
-                        0
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 1 }}>
+                        <EventIcon sx={{ mr: 1, color: 'primary.main' }} />
+                        <Typography variant="h4" color="primary">
+                          {statisticsLoading ? (
+                            <CircularProgress size={32} color="primary" />
+                          ) : (
+                            statistics.eventsCreated
+                          )}
+                        </Typography>
+                      </Box>
                       <Typography variant="body2" color="text.secondary">
                         Events Created
                       </Typography>
                     </Box>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Typography variant="h4" color="primary">
-                        0
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Events Attended
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Typography variant="h4" color="primary">
-                        0
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 1 }}>
+                        <ReplyIcon sx={{ mr: 1, color: 'primary.main' }} />
+                        <Typography variant="h4" color="primary">
+                          {statisticsLoading ? (
+                            <CircularProgress size={32} color="primary" />
+                          ) : (
+                            statistics.responsesGiven
+                          )}
+                        </Typography>
+                      </Box>
                       <Typography variant="body2" color="text.secondary">
                         Responses Given
                       </Typography>

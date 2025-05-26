@@ -69,12 +69,18 @@ def list_events():
 def get_event(event_id):
     db = firestore.client()
     uid = g.current_user['uid']
+    user_email = g.current_user.get('email')
+    
     doc = db.collection('events').document(event_id).get()
     if not doc.exists:
         return jsonify({'message': 'Event not found'}), 404
+    
     e = doc.to_dict()
     e['eventId'] = doc.id
     e['isOwner'] = (e.get('createdBy') == uid)
+    e['currentUserId'] = uid
+    e['currentUserEmail'] = user_email
+    
     return jsonify(e), 200
 
 @events_bp.route('/<event_id>', methods=['DELETE'])
@@ -104,12 +110,24 @@ def create_response(event_id):
         return jsonify({'errors': e.errors()}), 422
     db = firestore.client()
     ref = db.collection('events').document(event_id).collection('responses').document(g.current_user['uid'])
-    ref.set({
-        'availability': payload.availability,
-        'comments': payload.comments,
+    
+    response_data = {
         'userId': g.current_user['uid'],
+        'userEmail': g.current_user.get('email'),
         'updatedAt': SERVER_TIMESTAMP
-    })
+    }
+    
+    # Handle new RSVP system
+    if payload.rsvpStatus:
+        response_data['rsvpStatus'] = payload.rsvpStatus
+        response_data['comment'] = payload.comment or ''
+    
+    # Handle legacy availability system (for backward compatibility)
+    if payload.availability:
+        response_data['availability'] = payload.availability
+        response_data['comments'] = payload.comments or {}
+    
+    ref.set(response_data)
     return jsonify({'responseId': g.current_user['uid']}), 201
 
 @events_bp.route('/<event_id>/responses', methods=['GET'])

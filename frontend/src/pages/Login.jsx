@@ -9,8 +9,11 @@ import {
   Button,
   Link,
   Alert,
+  Paper,
+  Avatar,
 } from '@mui/material';
 import { useAuthStore } from '../stores/authStore';
+import logo from '../images/logo.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -36,18 +39,55 @@ export default function Login() {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
+    <Container component="main" maxWidth="xs" className="fade-in">
       <Box
         sx={{
           marginTop: 8,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          minHeight: '100vh',
+          justifyContent: 'center',
         }}
       >
-        <Typography component="h1" variant="h5">
-          Sign in
-        </Typography>
+        <Paper 
+          elevation={0}
+          className="glass"
+          sx={{ 
+            p: 4, 
+            width: '100%',
+            border: '1px solid rgba(29, 185, 84, 0.2)',
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+            <Avatar 
+              src={logo} 
+              alt="FreeTogether Logo"
+              sx={{ 
+                width: 60, 
+                height: 60, 
+                mb: 2,
+                borderRadius: '12px'
+              }}
+            />
+            <Typography 
+              component="h1" 
+              variant="h4"
+              sx={{
+                fontWeight: 900,
+                background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1,
+              }}
+            >
+              FreeTogether
+            </Typography>
+            <Typography variant="h6" color="text.secondary">
+              Sign in to your account
+            </Typography>
+          </Box>
         {error && (
           <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
             {error}
@@ -95,6 +135,7 @@ export default function Login() {
             </Link>
           </Box>
         </Box>
+        </Paper>
       </Box>
     </Container>
   );
