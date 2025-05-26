@@ -155,8 +155,16 @@ export default function Dashboard() {
                   Timezone: {event.timezone}
                 </Typography>
                 <Typography color="textSecondary" gutterBottom>
-                  {event.isOwner ? `Invitees: ${event.invitees?.length || 0}` : 'You are invited'}
+                  {event.isOwner 
+                    ? `Invitees: ${event.invitees?.length || 0}` 
+                    : `Owner: ${event.ownerName || event.ownerEmail || 'Unknown'}`
+                  }
                 </Typography>
+                {!event.isOwner && (
+                  <Typography color="textSecondary" variant="body2" gutterBottom>
+                    Invited people: {event.invitees?.length || 0}
+                  </Typography>
+                )}
                 <Box sx={{ mt: 1 }}>
                   <Chip
                     label={event.closed ? 'Closed' : 'Open'}
@@ -164,8 +172,8 @@ export default function Dashboard() {
                     size="small"
                   />
                   <Chip
-                    label={event.access}
-                    color={event.access === 'public' ? 'primary' : 'secondary'}
+                    label={event.type}
+                    color="primary"
                     size="small"
                     sx={{ ml: 1 }}
                   />

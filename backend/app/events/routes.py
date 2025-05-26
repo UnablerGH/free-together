@@ -26,8 +26,6 @@ def create_event():
         'name': payload.name,
         'type': payload.type,
         'timezone': payload.timezone,
-        'access': payload.access,
-        'endDate': payload.end_date,
         'invitees': payload.invitees,
         'createdBy': g.current_user['uid'],
         'createdAt': SERVER_TIMESTAMP,
@@ -52,6 +50,13 @@ def list_events():
         e = doc.to_dict()
         e['eventId'] = doc.id
         e['isOwner'] = True
+        # Add owner info for created events
+        e['ownerEmail'] = user_email
+        try:
+            current_user = auth.get_user(uid)
+            e['ownerName'] = current_user.display_name or current_user.email
+        except:
+            e['ownerName'] = user_email
         events.append(e)
 
     for doc in invited_q:
@@ -60,6 +65,14 @@ def list_events():
         e = doc.to_dict()
         e['eventId'] = doc.id
         e['isOwner'] = False
+        # Add owner info for invited events
+        try:
+            owner_user = auth.get_user(e.get('createdBy'))
+            e['ownerEmail'] = owner_user.email
+            e['ownerName'] = owner_user.display_name or owner_user.email
+        except:
+            e['ownerEmail'] = 'Unknown'
+            e['ownerName'] = 'Unknown'
         events.append(e)
 
     return jsonify(events), 200
@@ -80,6 +93,16 @@ def get_event(event_id):
     e['isOwner'] = (e.get('createdBy') == uid)
     e['currentUserId'] = uid
     e['currentUserEmail'] = user_email
+    
+    # Add owner email information
+    try:
+        owner_user = auth.get_user(e.get('createdBy'))
+        e['ownerEmail'] = owner_user.email
+        e['ownerName'] = owner_user.display_name or owner_user.email
+    except Exception as ex:
+        logger.warning(f"Could not get owner info: {ex}")
+        e['ownerEmail'] = 'Unknown'
+        e['ownerName'] = 'Unknown'
     
     return jsonify(e), 200
 
@@ -117,7 +140,17 @@ def create_response(event_id):
         'updatedAt': SERVER_TIMESTAMP
     }
     
-    # Handle new RSVP system
+    # Handle When2Meet-style time slot availability
+    if payload.timeSlots:
+        response_data['timeSlots'] = payload.timeSlots
+        # Get user info for display
+        try:
+            user = auth.get_user(g.current_user['uid'])
+            response_data['userName'] = user.display_name or user.email
+        except:
+            response_data['userName'] = g.current_user.get('email', 'Unknown User')
+    
+    # Handle new RSVP system (for backward compatibility)
     if payload.rsvpStatus:
         response_data['rsvpStatus'] = payload.rsvpStatus
         response_data['comment'] = payload.comment or ''
@@ -188,4 +221,77 @@ def invite_user(event_id):
         'message': response_message,
         'invited_count': len(valid_emails),
         'not_found': invalid_emails
+    }), 200
+
+@events_bp.route('/<event_id>/heatmap', methods=['GET'])
+@auth_required
+def get_heatmap_data(event_id):
+    """Get heatmap data for When2Meet-style visualization"""
+    db = firestore.client()
+    
+    # Check if user has access to this event
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'message': 'Event not found'}), 404
+    
+    event_data = event_doc.to_dict()
+    uid = g.current_user['uid']
+    user_email = g.current_user.get('email')
+    
+    # Check if user is owner or invited
+    is_owner = event_data.get('createdBy') == uid
+    is_invited = user_email in event_data.get('invitees', [])
+    
+    if not (is_owner or is_invited):
+        return jsonify({'message': 'Access denied'}), 403
+    
+    # Get all responses with time slots
+    responses = db.collection('events').document(event_id).collection('responses').stream()
+    
+    # Build heatmap data
+    slot_counts = {}  # slot -> count
+    user_responses = []  # list of {userName, timeSlots}
+    
+    for response_doc in responses:
+        response_data = response_doc.to_dict()
+        time_slots = response_data.get('timeSlots', [])
+        user_name = response_data.get('userName', 'Unknown User')
+        
+        if time_slots:
+            user_responses.append({
+                'userName': user_name,
+                'timeSlots': time_slots,
+                'userId': response_data.get('userId')
+            })
+            
+            # Count each slot
+            for slot in time_slots:
+                slot_counts[slot] = slot_counts.get(slot, 0) + 1
+    
+    # Generate time grid (7 days x 24 hours)
+    days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    hours = list(range(24))  # 0-23
+    
+    heatmap_grid = []
+    for day in days:
+        day_data = []
+        for hour in hours:
+            slot_key = f"{day}_{hour}"
+            count = slot_counts.get(slot_key, 0)
+            day_data.append({
+                'slot': slot_key,
+                'count': count,
+                'day': day,
+                'hour': hour
+            })
+        heatmap_grid.append({
+            'day': day,
+            'slots': day_data
+        })
+    
+    return jsonify({
+        'heatmapGrid': heatmap_grid,
+        'userResponses': user_responses,
+        'totalResponses': len(user_responses),
+        'maxCount': max(slot_counts.values()) if slot_counts else 0
     }), 200

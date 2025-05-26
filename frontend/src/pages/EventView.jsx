@@ -9,58 +9,36 @@ import {
   Button,
   Alert,
   Chip,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Snackbar,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Avatar,
-  Divider,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Help as HelpIcon,
-  Person as PersonIcon,
+  Schedule as ScheduleIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import { eventsAPI } from '../api';
 import InviteDialog from '../components/InviteDialog';
-
-const RSVP_OPTIONS = [
-  { value: 'yes', label: 'Yes, I will attend', color: 'success', icon: CheckCircleIcon },
-  { value: 'no', label: 'No, I cannot attend', color: 'error', icon: CancelIcon },
-  { value: 'maybe', label: 'Maybe, not sure yet', color: 'warning', icon: HelpIcon },
-];
+import TimeSlotSelector from '../components/TimeSlotSelector';
+import AvailabilityHeatmap from '../components/AvailabilityHeatmap';
 
 export default function EventView() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [responses, setResponses] = useState([]);
+  const [heatmapData, setHeatmapData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
   
-  // RSVP state
+  // Time slot selection state
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [submittingSlots, setSubmittingSlots] = useState(false);
   const [userResponse, setUserResponse] = useState(null);
-  const [rsvpStatus, setRsvpStatus] = useState('');
-  const [rsvpComment, setRsvpComment] = useState('');
-  const [submittingRsvp, setSubmittingRsvp] = useState(false);
 
   useEffect(() => {
     loadEventData();
@@ -69,13 +47,15 @@ export default function EventView() {
   const loadEventData = async () => {
     try {
       setLoading(true);
-      const [eventResponse, responsesResponse] = await Promise.all([
+      const [eventResponse, responsesResponse, heatmapResponse] = await Promise.all([
         eventsAPI.getEvent(eventId),
         eventsAPI.getResponses(eventId),
+        eventsAPI.getHeatmapData(eventId).catch(() => ({ data: null })), // Don't fail if heatmap fails
       ]);
       
       setEvent(eventResponse.data);
       setResponses(responsesResponse.data);
+      setHeatmapData(heatmapResponse.data);
       
       // Find current user's response
       const currentUserResponse = responsesResponse.data.find(
@@ -84,8 +64,7 @@ export default function EventView() {
       
       if (currentUserResponse) {
         setUserResponse(currentUserResponse);
-        setRsvpStatus(currentUserResponse.rsvpStatus || '');
-        setRsvpComment(currentUserResponse.comment || '');
+        setSelectedSlots(currentUserResponse.timeSlots || []);
       }
       
       setError(null);
@@ -97,26 +76,25 @@ export default function EventView() {
     }
   };
 
-  const handleRsvpSubmit = async () => {
-    if (!rsvpStatus) {
-      setError('Please select your RSVP status');
+  const handleSlotsSubmit = async () => {
+    if (selectedSlots.length === 0) {
+      setError('Please select at least one time slot');
       return;
     }
 
     try {
-      setSubmittingRsvp(true);
+      setSubmittingSlots(true);
       await eventsAPI.submitResponse(eventId, {
-        rsvpStatus,
-        comment: rsvpComment,
+        timeSlots: selectedSlots,
       });
       
-      setSuccessMessage('Your RSVP has been submitted successfully!');
+      setSuccessMessage('Your availability has been submitted successfully!');
       await loadEventData(); // Refresh to show updated response
     } catch (err) {
-      setError('Failed to submit RSVP');
+      setError('Failed to submit availability');
       console.error(err);
     } finally {
-      setSubmittingRsvp(false);
+      setSubmittingSlots(false);
     }
   };
 
@@ -134,28 +112,8 @@ export default function EventView() {
     setSuccessMessage('');
   };
 
-  const getResponseSummary = () => {
-    const summary = { yes: 0, no: 0, maybe: 0, pending: 0 };
-    const totalInvited = event.invitees?.length || 0;
-    
-    responses.forEach(response => {
-      const status = response.rsvpStatus || 'pending';
-      if (summary[status] !== undefined) {
-        summary[status]++;
-      }
-    });
-    
-    summary.pending = totalInvited - (summary.yes + summary.no + summary.maybe);
-    return summary;
-  };
-
-  const getRsvpIcon = (status) => {
-    const option = RSVP_OPTIONS.find(opt => opt.value === status);
-    if (option) {
-      const IconComponent = option.icon;
-      return <IconComponent color={option.color} />;
-    }
-    return <HelpIcon color="disabled" />;
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
   };
 
   if (loading) {
@@ -188,7 +146,6 @@ export default function EventView() {
     );
   }
 
-  const responseSummary = getResponseSummary();
   const isInvited = event.invitees?.includes(event.currentUserEmail) || event.isOwner;
 
   return (
@@ -221,11 +178,19 @@ export default function EventView() {
                 color="secondary"
                 sx={{ mr: 1 }}
               />
-              <Chip
-                label={event.access}
-                color={event.access === 'public' ? 'success' : 'warning'}
-              />
             </Box>
+            <Typography variant="body1" color="text.secondary">
+              When2Meet-style scheduling - select your available time slots
+            </Typography>
+            
+            {/* Show event owner for invited users */}
+            {!event.isOwner && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Event Owner:</strong> {event.ownerEmail || 'Unknown'}
+                </Typography>
+              </Box>
+            )}
           </Box>
           {event.isOwner && (
             <Button
@@ -239,302 +204,176 @@ export default function EventView() {
           )}
         </Box>
 
-        <Grid container spacing={3}>
-          {/* RSVP Section (for invited users) */}
-          {isInvited && !event.isOwner && (
-            <Grid item xs={12}>
-              <Paper 
-                className="glass hover-lift"
-                sx={{ 
-                  p: 3, 
-                  mb: 3,
-                  border: '1px solid rgba(29, 185, 84, 0.2)',
-                }}
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Tabs */}
+        <Paper elevation={0} className="glass" sx={{ mb: 3, border: '1px solid rgba(29, 185, 84, 0.2)' }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={handleTabChange}
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            {isInvited && !event.isOwner && (
+              <Tab 
+                icon={<ScheduleIcon />} 
+                label="Select Availability" 
+                iconPosition="start"
+              />
+            )}
+            <Tab 
+              icon={<BarChartIcon />} 
+              label="View Results" 
+              iconPosition="start"
+            />
+          </Tabs>
+        </Paper>
+
+        {/* Tab Content */}
+        {/* Availability Selection Tab (for invited users) */}
+        {isInvited && !event.isOwner && activeTab === 0 && (
+          <Box>
+            {userResponse && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                You have already submitted your availability. You can update it below.
+              </Alert>
+            )}
+            
+            <TimeSlotSelector
+              selectedSlots={selectedSlots}
+              onSlotsChange={setSelectedSlots}
+              disabled={submittingSlots}
+            />
+            
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                onClick={handleSlotsSubmit}
+                disabled={submittingSlots || selectedSlots.length === 0}
+                size="large"
               >
-                <Typography 
-                  variant="h5" 
-                  gutterBottom
-                  sx={{ 
-                    fontWeight: 700,
-                    color: 'primary.main'
-                  }}
+                {submittingSlots ? 'Submitting...' : userResponse ? 'Update Availability' : 'Submit Availability'}
+              </Button>
+              
+              {selectedSlots.length > 0 && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setSelectedSlots([])}
+                  disabled={submittingSlots}
                 >
-                  Your RSVP
+                  Clear All
+                </Button>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Results/Heatmap Tab */}
+        {((isInvited && !event.isOwner && activeTab === 1) || (event.isOwner && activeTab === 0) || (!isInvited)) && (
+          <Box>
+            {heatmapData ? (
+              <AvailabilityHeatmap
+                heatmapData={heatmapData.heatmapGrid}
+                userResponses={heatmapData.userResponses}
+                maxCount={heatmapData.maxCount}
+              />
+            ) : (
+              <Paper elevation={0} className="glass" sx={{ p: 4, textAlign: 'center', border: '1px solid rgba(29, 185, 84, 0.2)' }}>
+                <Typography variant="h6" color="text.secondary">
+                  No availability data yet
                 </Typography>
-                
-                {userResponse ? (
-                  <Box>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      You have already responded to this event. You can update your response below.
-                    </Alert>
+                <Typography variant="body2" color="text.secondary">
+                  Invite people and ask them to submit their availability to see the heatmap.
+                </Typography>
+              </Paper>
+            )}
+
+            {/* Event Info */}
+            <Paper elevation={0} className="glass" sx={{ p: 3, mt: 3, border: '1px solid rgba(29, 185, 84, 0.2)' }}>
+              <Typography variant="h6" gutterBottom>
+                Event Information
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <strong>Type:</strong> {event.type}
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <strong>Timezone:</strong> {event.timezone}
+                  </Typography>
+                  {!event.isOwner && (
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Event Owner:</strong> {event.ownerEmail || 'Unknown'}
+                    </Typography>
+                  )}
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <strong>Total Invited:</strong> {event.invitees?.length || 0}
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <strong>Responses:</strong> {responses.filter(r => r.timeSlots?.length > 0).length}
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* Invitees List - Show for everyone */}
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Invited People ({event.invitees?.length || 0}):
+                </Typography>
+                {event.invitees && event.invitees.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {event.invitees.map((email, index) => (
+                      <Chip
+                        key={index}
+                        label={email}
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                      />
+                    ))}
                   </Box>
                 ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Please let us know if you can attend this event.
-                  </Typography>
-                )}
-
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Will you attend?</InputLabel>
-                  <Select
-                    value={rsvpStatus}
-                    onChange={(e) => setRsvpStatus(e.target.value)}
-                    label="Will you attend?"
-                  >
-                    {RSVP_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          {getRsvpIcon(option.value)}
-                          <Typography sx={{ ml: 1 }}>{option.label}</Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  fullWidth
-                  label="Comment (optional)"
-                  value={rsvpComment}
-                  onChange={(e) => setRsvpComment(e.target.value)}
-                  multiline
-                  rows={2}
-                  placeholder="Add any comments or notes..."
-                  sx={{ mb: 2 }}
-                />
-
-                <Button
-                  variant="contained"
-                  onClick={handleRsvpSubmit}
-                  disabled={submittingRsvp || !rsvpStatus}
-                  sx={{ mr: 2 }}
-                >
-                  {submittingRsvp ? 'Submitting...' : userResponse ? 'Update RSVP' : 'Submit RSVP'}
-                </Button>
-              </Paper>
-            </Grid>
-          )}
-
-          {/* Event Details */}
-          <Grid item xs={12} md={event.isOwner ? 6 : 12}>
-            <Paper 
-              className="hover-lift"
-              sx={{ 
-                p: 3,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
-            >
-              <Typography 
-                variant="h5" 
-                gutterBottom
-                sx={{ 
-                  fontWeight: 700,
-                  color: 'primary.main'
-                }}
-              >
-                Event Details
-              </Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body1" sx={{ mb: 1 }}>
-                  <strong>Type:</strong> {event.type}
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 1 }}>
-                  <strong>Timezone:</strong> {event.timezone}
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 1 }}>
-                  <strong>Access:</strong> {event.access}
-                </Typography>
-                {event.end_date && (
-                  <Typography variant="body1" sx={{ mb: 1 }}>
-                    <strong>End Date:</strong> {new Date(event.end_date).toLocaleString()}
+                  <Typography variant="body2" color="text.secondary">
+                    No one has been invited yet.
                   </Typography>
                 )}
               </Box>
 
-              <Divider sx={{ my: 2 }} />
-
-              {/* Response Summary */}
-              <Typography 
-                variant="h6" 
-                gutterBottom
-                sx={{ 
-                  fontWeight: 600,
-                  color: 'text.primary'
-                }}
-              >
-                Response Summary
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={3}>
-                  <Card 
-                    variant="outlined"
-                    className="hover-lift"
-                    sx={{
-                      background: 'linear-gradient(135deg, rgba(29, 185, 84, 0.1) 0%, rgba(29, 185, 84, 0.05) 100%)',
-                      border: '1px solid rgba(29, 185, 84, 0.3)',
-                    }}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                      <Typography variant="h4" color="success.main">
-                        {responseSummary.yes}
-                      </Typography>
-                      <Typography variant="body2">Attending</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={3}>
-                  <Card 
-                    variant="outlined"
-                    className="hover-lift"
-                    sx={{
-                      background: 'linear-gradient(135deg, rgba(226, 33, 52, 0.1) 0%, rgba(226, 33, 52, 0.05) 100%)',
-                      border: '1px solid rgba(226, 33, 52, 0.3)',
-                    }}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                      <Typography variant="h4" color="error.main">
-                        {responseSummary.no}
-                      </Typography>
-                      <Typography variant="body2">Not Attending</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={3}>
-                  <Card 
-                    variant="outlined"
-                    className="hover-lift"
-                    sx={{
-                      background: 'linear-gradient(135deg, rgba(255, 167, 38, 0.1) 0%, rgba(255, 167, 38, 0.05) 100%)',
-                      border: '1px solid rgba(255, 167, 38, 0.3)',
-                    }}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                      <Typography variant="h4" color="warning.main">
-                        {responseSummary.maybe}
-                      </Typography>
-                      <Typography variant="body2">Maybe</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={3}>
-                  <Card 
-                    variant="outlined"
-                    className="hover-lift"
-                    sx={{
-                      background: 'linear-gradient(135deg, rgba(179, 179, 179, 0.1) 0%, rgba(179, 179, 179, 0.05) 100%)',
-                      border: '1px solid rgba(179, 179, 179, 0.3)',
-                    }}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                      <Typography variant="h4" color="text.secondary">
-                        {responseSummary.pending}
-                      </Typography>
-                      <Typography variant="body2">Pending</Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
-              {/* Invitees List */}
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                Invited People ({event.invitees?.length || 0})
-              </Typography>
-              {event.invitees && event.invitees.length > 0 ? (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {event.invitees.map((email, index) => (
-                    <Chip
-                      key={index}
-                      label={email}
-                      variant="outlined"
-                      size="small"
-                      color="primary"
-                    />
-                  ))}
+              {/* Show who has responded */}
+              {responses.filter(r => r.timeSlots?.length > 0).length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    People who have responded:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {responses
+                      .filter(r => r.timeSlots?.length > 0)
+                      .map((response, index) => (
+                        <Chip
+                          key={index}
+                          label={`${response.userName || response.userEmail || 'Unknown'} (${response.timeSlots?.length || 0} slots)`}
+                          variant="filled"
+                          size="small"
+                          color="success"
+                          sx={{ 
+                            backgroundColor: 'rgba(29, 185, 84, 0.1)',
+                            color: 'primary.main',
+                            border: '1px solid rgba(29, 185, 84, 0.3)'
+                          }}
+                        />
+                      ))}
+                  </Box>
                 </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No one has been invited yet.
-                </Typography>
               )}
             </Paper>
-          </Grid>
-
-          {/* Detailed Responses (for event owners) */}
-          {event.isOwner && (
-            <Grid item xs={12} md={6}>
-              <Paper 
-                className="hover-lift"
-                sx={{ 
-                  p: 3,
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                }}
-              >
-                <Typography 
-                  variant="h5" 
-                  gutterBottom
-                  sx={{ 
-                    fontWeight: 700,
-                    color: 'primary.main'
-                  }}
-                >
-                  Detailed Responses
-                </Typography>
-                
-                {responses.length > 0 ? (
-                  <List>
-                    {responses.map((response, index) => (
-                      <ListItem key={index} divider={index < responses.length - 1}>
-                        <ListItemAvatar>
-                          <Avatar>
-                            {getRsvpIcon(response.rsvpStatus)}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={response.userEmail || 'Unknown User'}
-                          secondary={
-                            <React.Fragment>
-                              <Typography 
-                                component="span"
-                                variant="body2" 
-                                color="text.primary"
-                                sx={{ display: 'block', mb: 0.5 }}
-                              >
-                                Status: {RSVP_OPTIONS.find(opt => opt.value === response.rsvpStatus)?.label || 'No response'}
-                              </Typography>
-                              {response.comment && (
-                                <Typography 
-                                  component="span"
-                                  variant="body2" 
-                                  color="text.secondary"
-                                  sx={{ display: 'block', mb: 0.5 }}
-                                >
-                                  Comment: {response.comment}
-                                </Typography>
-                              )}
-                              <Typography 
-                                component="span"
-                                variant="caption" 
-                                color="text.secondary"
-                                sx={{ display: 'block' }}
-                              >
-                                {response.updatedAt ? `Updated: ${new Date(response.updatedAt.seconds * 1000).toLocaleString()}` : 'No update time'}
-                              </Typography>
-                            </React.Fragment>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    No responses yet.
-                  </Typography>
-                )}
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
+          </Box>
+        )}
       </Box>
 
       {/* Invite Dialog */}

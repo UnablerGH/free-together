@@ -76,6 +76,7 @@ export const eventsAPI = {
   submitResponse: (eventId, data) => api.post(`/events/${eventId}/responses`, data),
   getResponses: (eventId) => api.get(`/events/${eventId}/responses`),
   inviteUsers: (eventId, data) => api.post(`/events/${eventId}/invite`, data),
+  getHeatmapData: (eventId) => api.get(`/events/${eventId}/heatmap`),
 };
 
 export default api;

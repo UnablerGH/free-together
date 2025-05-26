@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, Dict
 from pydantic import BaseModel
 from pydantic.types import StringConstraints
 from datetime import datetime
@@ -16,9 +16,10 @@ class EventCreateModel(BaseModel):
         str,
         StringConstraints(min_length=1),
     ]
-    access: Annotated[
-        str,
-        StringConstraints(pattern=r'^(public|restricted)$'),
-    ]
-    end_date: Optional[datetime] = None
     invitees: Optional[List[str]] = []
+
+class TimeSlotAvailabilityModel(BaseModel):
+    # Time slots are represented as "day_hour" format (e.g., "monday_14" for Monday 2 PM)
+    available_slots: List[str]
+    user_email: str
+    user_name: Optional[str] = None

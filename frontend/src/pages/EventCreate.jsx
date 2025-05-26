@@ -10,11 +10,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Switch,
   Alert,
+  Paper,
 } from '@mui/material';
-import { DateTimePicker } from '@mui/x-date-pickers';
 import { eventsAPI } from '../api';
 
 const TIMEZONES = [
@@ -37,8 +35,6 @@ export default function EventCreate() {
     name: '',
     type: 'once',
     timezone: 'UTC',
-    access: 'public',
-    end_date: null,
     invitees: [],
   });
 
@@ -72,7 +68,7 @@ export default function EventCreate() {
           gutterBottom
           sx={{
             fontWeight: 900,
-            mb: 4,
+            mb: 2,
             background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
@@ -81,81 +77,71 @@ export default function EventCreate() {
         >
           Create New Event
         </Typography>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            label="Event Name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            margin="normal"
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Event Type</InputLabel>
-            <Select
-              name="type"
-              value={formData.type}
+        
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          Create a When2Meet-style event where invitees can select their available time slots
+        </Typography>
+
+        <Paper elevation={0} className="glass" sx={{ p: 4, border: '1px solid rgba(29, 185, 84, 0.2)' }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+          
+          <Box component="form" onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Event Name"
+              name="name"
+              value={formData.name}
               onChange={handleChange}
-              label="Event Type"
-            >
-              <MenuItem value="once">One-time Event</MenuItem>
-              <MenuItem value="weekly">Weekly Event</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Timezone</InputLabel>
-            <Select
-              name="timezone"
-              value={formData.timezone}
-              onChange={handleChange}
-              label="Timezone"
-            >
-              {TIMEZONES.map((tz) => (
-                <MenuItem key={tz} value={tz}>
-                  {tz}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Access Level</InputLabel>
-            <Select
-              name="access"
-              value={formData.access}
-              onChange={handleChange}
-              label="Access Level"
-            >
-              <MenuItem value="public">Public</MenuItem>
-              <MenuItem value="restricted">Restricted</MenuItem>
-            </Select>
-          </FormControl>
-          <Box sx={{ mt: 2, mb: 2 }}>
-            <DateTimePicker
-              label="End Date (Optional)"
-              value={formData.end_date}
-              onChange={(newValue) =>
-                setFormData((prev) => ({ ...prev, end_date: newValue }))
-              }
-              renderInput={(params) => <TextField {...params} fullWidth />}
+              required
+              margin="normal"
+              placeholder="e.g., Team Meeting, Study Session, Dinner Plans"
             />
+            
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Event Type</InputLabel>
+              <Select
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+                label="Event Type"
+              >
+                <MenuItem value="once">One-time Event</MenuItem>
+                <MenuItem value="weekly">Weekly Event</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Timezone</InputLabel>
+              <Select
+                name="timezone"
+                value={formData.timezone}
+                onChange={handleChange}
+                label="Timezone"
+              >
+                {TIMEZONES.map((tz) => (
+                  <MenuItem key={tz} value={tz}>
+                    {tz}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              fullWidth
+              disabled={loading}
+              sx={{ mt: 3 }}
+            >
+              {loading ? 'Creating...' : 'Create Event'}
+            </Button>
           </Box>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            fullWidth
-            disabled={loading}
-            sx={{ mt: 2 }}
-          >
-            {loading ? 'Creating...' : 'Create Event'}
-          </Button>
-        </Box>
+        </Paper>
       </Box>
     </Container>
   );

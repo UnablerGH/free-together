@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from pydantic import BaseModel, validator
 
 class ResponseCreateModel(BaseModel):
@@ -9,6 +9,9 @@ class ResponseCreateModel(BaseModel):
     # New RSVP system
     rsvpStatus: Optional[str] = None
     comment: Optional[str] = None
+    
+    # When2Meet-style time slot availability
+    timeSlots: Optional[List[str]] = None
     
     @validator('rsvpStatus')
     def validate_rsvp_status(cls, v):
